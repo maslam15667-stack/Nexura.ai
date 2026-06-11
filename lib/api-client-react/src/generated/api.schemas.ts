@@ -11,7 +11,6 @@ export interface HealthStatus {
 
 export interface ChatMessageInput {
   message: string;
-  /** normal | tsundere | waifu | senpai | villain | yandere | kuudere */
   mode: string;
   /** @nullable */
   sessionId?: string | null;
@@ -32,6 +31,11 @@ export interface ChatMessage {
 
 export interface MathInput {
   problem: string;
+  /**
+     * Optional base64 encoded image of a math problem
+     * @nullable
+     */
+  imageBase64?: string | null;
 }
 
 export interface MathSolution {
@@ -57,12 +61,10 @@ export interface SearchResults {
 
 export interface ImageGenInput {
   prompt: string;
-  /** anime | realistic | cartoon | 3d */
   style: string;
 }
 
 export interface ImageGenResult {
-  /** Array of image URLs or base64 data */
   images: string[];
 }
 
@@ -71,7 +73,6 @@ export interface PaymentInput {
 }
 
 export interface PaymentStatus {
-  /** pending | approved | expired | none */
   status: string;
   /** @nullable */
   approvedAt?: string | null;
@@ -79,6 +80,17 @@ export interface PaymentStatus {
   expiresAt?: string | null;
   /** @nullable */
   utrNumber?: string | null;
+}
+
+export interface AdminPayment {
+  id: number;
+  utrNumber: string;
+  status: string;
+  /** @nullable */
+  approvedAt?: string | null;
+  /** @nullable */
+  expiresAt?: string | null;
+  createdAt: string;
 }
 
 export interface Prompt {
@@ -105,11 +117,8 @@ export interface DeleteResult {
 
 export interface VoiceInput {
   text: string;
-  /** tsundere | waifu | senpai | villain | yandere | kuudere */
   character: string;
-  /** soft | angry | cute | deep | whisper | energetic | calm */
   voiceType: string;
-  /** auto | tamil | english | hindi | malayalam | japanese */
   language: string;
 }
 

@@ -16,6 +16,7 @@ tags:
   - name: prompts
   - name: voice
   - name: settings
+  - name: admin
 paths:
   /healthz:
     get:
@@ -281,6 +282,59 @@ paths:
               schema:
                 $ref: "#/components/schemas/Settings"
 
+  /admin/payments:
+    get:
+      operationId: adminListPayments
+      tags: [admin]
+      summary: List all payment submissions (admin)
+      responses:
+        "200":
+          description: All payments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AdminPayment"
+
+  /admin/payments/{id}/approve:
+    post:
+      operationId: adminApprovePayment
+      tags: [admin]
+      summary: Approve a payment
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Updated payment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminPayment"
+
+  /admin/payments/{id}/reject:
+    post:
+      operationId: adminRejectPayment
+      tags: [admin]
+      summary: Reject a payment
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Updated payment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminPayment"
+
 components:
   schemas:
     HealthStatus:
@@ -298,7 +352,6 @@ components:
           type: string
         mode:
           type: string
-          description: "normal | tsundere | waifu | senpai | villain | yandere | kuudere"
         sessionId:
           type: ["string", "null"]
 
@@ -332,6 +385,9 @@ components:
       properties:
         problem:
           type: string
+        imageBase64:
+          type: ["string", "null"]
+          description: Optional base64 encoded image of a math problem
 
     MathSolution:
       type: object
@@ -381,7 +437,6 @@ components:
           type: string
         style:
           type: string
-          description: "anime | realistic | cartoon | 3d"
 
     ImageGenResult:
       type: object
@@ -391,7 +446,6 @@ components:
           type: array
           items:
             type: string
-          description: Array of image URLs or base64 data
 
     PaymentInput:
       type: object
@@ -406,13 +460,29 @@ components:
       properties:
         status:
           type: string
-          description: "pending | approved | expired | none"
         approvedAt:
           type: ["string", "null"]
         expiresAt:
           type: ["string", "null"]
         utrNumber:
           type: ["string", "null"]
+
+    AdminPayment:
+      type: object
+      required: [id, utrNumber, status, createdAt]
+      properties:
+        id:
+          type: integer
+        utrNumber:
+          type: string
+        status:
+          type: string
+        approvedAt:
+          type: ["string", "null"]
+        expiresAt:
+          type: ["string", "null"]
+        createdAt:
+          type: string
 
     Prompt:
       type: object
@@ -461,13 +531,10 @@ components:
           type: string
         character:
           type: string
-          description: "tsundere | waifu | senpai | villain | yandere | kuudere"
         voiceType:
           type: string
-          description: "soft | angry | cute | deep | whisper | energetic | calm"
         language:
           type: string
-          description: "auto | tamil | english | hindi | malayalam | japanese"
 
     VoiceResult:
       type: object

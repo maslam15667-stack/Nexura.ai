@@ -8,10 +8,7 @@
 
 export interface VoiceInput {
   text: string;
-  /** tsundere | waifu | senpai | villain | yandere | kuudere */
   character: string;
-  /** soft | angry | cute | deep | whisper | energetic | calm */
   voiceType: string;
-  /** auto | tamil | english | hindi | malayalam | japanese */
   language: string;
 }

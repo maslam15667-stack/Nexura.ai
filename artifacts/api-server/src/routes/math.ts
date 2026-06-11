@@ -18,7 +18,7 @@ router.post("/math/solve", async (req, res): Promise<void> => {
     return;
   }
 
-  const { problem } = parsed.data;
+  const { problem, imageBase64 } = parsed.data;
   const apiKey = await getGeminiApiKey();
 
   if (!apiKey) {
@@ -31,44 +31,71 @@ router.post("/math/solve", async (req, res): Promise<void> => {
   }
 
   try {
-    const prompt = `Solve this math problem step by step. Format your response as JSON with these fields:
-- "steps": array of strings, each being a numbered step
+    const systemPrompt = `Solve this math problem step by step. Format your response as JSON with these fields:
+- "steps": array of strings, each being a clear numbered step
 - "answer": the final answer as a string
 - "latex": optional LaTeX representation of the final answer
 
-Problem: ${problem}
-
 Respond ONLY with valid JSON, no markdown, no code blocks.`;
+
+    let requestBody: object;
+
+    if (imageBase64) {
+      requestBody = {
+        contents: [{
+          parts: [
+            { text: systemPrompt + "\n\nSolve the math problem shown in this image:" },
+            {
+              inline_data: {
+                mime_type: "image/jpeg",
+                data: imageBase64,
+              }
+            }
+          ]
+        }],
+        generationConfig: { responseMimeType: "application/json" },
+      };
+    } else {
+      requestBody = {
+        contents: [{ parts: [{ text: systemPrompt + `\n\nProblem: ${problem}` }] }],
+        generationConfig: { responseMimeType: "application/json" },
+      };
+    }
 
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { responseMimeType: "application/json" },
-        }),
+        body: JSON.stringify(requestBody),
       }
     );
 
     if (!response.ok) {
+      const errText = await response.text();
+      logger.error({ status: response.status, body: errText }, "Gemini math error");
       throw new Error(`Gemini error: ${response.status}`);
     }
 
     const data = await response.json() as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
     const text = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "{}";
-    const parsed2 = JSON.parse(text);
+
+    let parsedSolution: { steps?: unknown; answer?: unknown; latex?: unknown } = {};
+    try {
+      parsedSolution = JSON.parse(text);
+    } catch {
+      parsedSolution = { steps: [text], answer: "See above", latex: null };
+    }
 
     res.json(SolveMathResponse.parse({
-      steps: Array.isArray(parsed2.steps) ? parsed2.steps : [text],
-      answer: parsed2.answer ?? "See steps above",
-      latex: parsed2.latex ?? null,
+      steps: Array.isArray(parsedSolution.steps) ? parsedSolution.steps : [String(parsedSolution.steps ?? text)],
+      answer: String(parsedSolution.answer ?? "See steps above"),
+      latex: parsedSolution.latex ? String(parsedSolution.latex) : null,
     }));
   } catch (err) {
     logger.error({ err }, "Math solver failed");
     res.json(SolveMathResponse.parse({
-      steps: ["Error solving the problem. Please try again."],
+      steps: ["Error solving the problem. Please check your API key and try again."],
       answer: "Error",
       latex: null,
     }));

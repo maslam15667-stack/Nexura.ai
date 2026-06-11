@@ -21,7 +21,7 @@ export const HealthCheckResponse = zod.object({
  */
 export const SendChatMessageBody = zod.object({
   "message": zod.string(),
-  "mode": zod.string().describe('normal | tsundere | waifu | senpai | villain | yandere | kuudere'),
+  "mode": zod.string(),
   "sessionId": zod.string().nullish()
 })
 
@@ -52,7 +52,8 @@ export const GetChatHistoryResponse = zod.array(GetChatHistoryResponseItem)
  * @summary Solve a math problem step by step
  */
 export const SolveMathBody = zod.object({
-  "problem": zod.string()
+  "problem": zod.string(),
+  "imageBase64": zod.string().nullish().describe('Optional base64 encoded image of a math problem')
 })
 
 export const SolveMathResponse = zod.object({
@@ -83,11 +84,11 @@ export const WebSearchResponse = zod.object({
  */
 export const GenerateImageBody = zod.object({
   "prompt": zod.string(),
-  "style": zod.string().describe('anime | realistic | cartoon | 3d')
+  "style": zod.string()
 })
 
 export const GenerateImageResponse = zod.object({
-  "images": zod.array(zod.string()).describe('Array of image URLs or base64 data')
+  "images": zod.array(zod.string())
 })
 
 
@@ -99,7 +100,7 @@ export const SubmitPaymentBody = zod.object({
 })
 
 export const SubmitPaymentResponse = zod.object({
-  "status": zod.string().describe('pending | approved | expired | none'),
+  "status": zod.string(),
   "approvedAt": zod.string().nullish(),
   "expiresAt": zod.string().nullish(),
   "utrNumber": zod.string().nullish()
@@ -110,7 +111,7 @@ export const SubmitPaymentResponse = zod.object({
  * @summary Get payment/subscription status
  */
 export const GetPaymentStatusResponse = zod.object({
-  "status": zod.string().describe('pending | approved | expired | none'),
+  "status": zod.string(),
   "approvedAt": zod.string().nullish(),
   "expiresAt": zod.string().nullish(),
   "utrNumber": zod.string().nullish()
@@ -177,9 +178,9 @@ export const DeletePromptResponse = zod.object({
  */
 export const VoiceSpeakBody = zod.object({
   "text": zod.string(),
-  "character": zod.string().describe('tsundere | waifu | senpai | villain | yandere | kuudere'),
-  "voiceType": zod.string().describe('soft | angry | cute | deep | whisper | energetic | calm'),
-  "language": zod.string().describe('auto | tamil | english | hindi | malayalam | japanese')
+  "character": zod.string(),
+  "voiceType": zod.string(),
+  "language": zod.string()
 })
 
 export const VoiceSpeakResponse = zod.object({
@@ -215,6 +216,54 @@ export const SaveSettingsResponse = zod.object({
   "hasElevenLabsKey": zod.boolean(),
   "hasTavilyKey": zod.boolean(),
   "theme": zod.string()
+})
+
+
+/**
+ * @summary List all payment submissions (admin)
+ */
+export const AdminListPaymentsResponseItem = zod.object({
+  "id": zod.number(),
+  "utrNumber": zod.string(),
+  "status": zod.string(),
+  "approvedAt": zod.string().nullish(),
+  "expiresAt": zod.string().nullish(),
+  "createdAt": zod.string()
+})
+export const AdminListPaymentsResponse = zod.array(AdminListPaymentsResponseItem)
+
+
+/**
+ * @summary Approve a payment
+ */
+export const AdminApprovePaymentParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const AdminApprovePaymentResponse = zod.object({
+  "id": zod.number(),
+  "utrNumber": zod.string(),
+  "status": zod.string(),
+  "approvedAt": zod.string().nullish(),
+  "expiresAt": zod.string().nullish(),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary Reject a payment
+ */
+export const AdminRejectPaymentParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const AdminRejectPaymentResponse = zod.object({
+  "id": zod.number(),
+  "utrNumber": zod.string(),
+  "status": zod.string(),
+  "approvedAt": zod.string().nullish(),
+  "expiresAt": zod.string().nullish(),
+  "createdAt": zod.string()
 })
 
 

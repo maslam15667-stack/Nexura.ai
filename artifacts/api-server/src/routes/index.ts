@@ -8,6 +8,7 @@ import paymentRouter from "./payment";
 import promptsRouter from "./prompts";
 import voiceRouter from "./voice";
 import settingsRouter from "./settings";
+import adminRouter from "./admin";
 
 const router: IRouter = Router();
 
@@ -20,5 +21,6 @@ router.use(paymentRouter);
 router.use(promptsRouter);
 router.use(voiceRouter);
 router.use(settingsRouter);
+router.use(adminRouter);
 
 export default router;

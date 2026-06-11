@@ -6,12 +6,13 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface PaymentStatus {
+export interface AdminPayment {
+  id: number;
+  utrNumber: string;
   status: string;
   /** @nullable */
   approvedAt?: string | null;
   /** @nullable */
   expiresAt?: string | null;
-  /** @nullable */
-  utrNumber?: string | null;
+  createdAt: string;
 }

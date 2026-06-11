@@ -8,4 +8,9 @@
 
 export interface MathInput {
   problem: string;
+  /**
+     * Optional base64 encoded image of a math problem
+     * @nullable
+     */
+  imageBase64?: string | null;
 }

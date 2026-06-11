@@ -7,6 +7,5 @@
  */
 
 export interface ImageGenResult {
-  /** Array of image URLs or base64 data */
   images: string[];
 }

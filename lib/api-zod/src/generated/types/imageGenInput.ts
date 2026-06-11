@@ -8,6 +8,5 @@
 
 export interface ImageGenInput {
   prompt: string;
-  /** anime | realistic | cartoon | 3d */
   style: string;
 }

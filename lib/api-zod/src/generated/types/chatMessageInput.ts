@@ -8,7 +8,6 @@
 
 export interface ChatMessageInput {
   message: string;
-  /** normal | tsundere | waifu | senpai | villain | yandere | kuudere */
   mode: string;
   /** @nullable */
   sessionId?: string | null;

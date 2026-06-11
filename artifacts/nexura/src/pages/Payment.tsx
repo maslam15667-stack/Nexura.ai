@@ -1,10 +1,17 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { useSubmitPayment, useGetPaymentStatus, getGetPaymentStatusQueryKey } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { CreditCard, QrCode, CheckCircle, Clock } from "lucide-react";
+import { CheckCircle, Clock, XCircle } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
+import { QRCodeSVG } from "qrcode.react";
+import { LogoBackground } from "@/components/LogoBackground";
+import { motion } from "framer-motion";
+
+const UPI_ID = "nexura@ybl";
+const UPI_NAME = "NEXURA AI";
+const AMOUNT = "10";
+const UPI_URI = `upi://pay?pa=${UPI_ID}&pn=${encodeURIComponent(UPI_NAME)}&am=${AMOUNT}&cu=INR&tn=${encodeURIComponent("NEXURA Daily Pass")}`;
 
 export default function Payment() {
   const [utr, setUtr] = useState("");
@@ -27,61 +34,108 @@ export default function Payment() {
   const status = statusData?.status || "none";
 
   return (
-    <div className="flex flex-col items-center justify-center h-full relative overflow-y-auto p-4 md:p-8">
-      <div className="max-w-md w-full">
-        <Card className="glass border-primary/30 glow-border text-center overflow-hidden">
-          <div className="bg-primary/10 py-6 border-b border-primary/20">
-            <CreditCard className="w-12 h-12 text-primary mx-auto mb-4" />
-            <CardTitle className="text-3xl font-display glow-text">NEXURA Premium</CardTitle>
-            <CardDescription className="text-lg mt-2 text-primary/80">₹10 Daily Pass</CardDescription>
+    <div className="flex flex-col items-center justify-center h-full relative overflow-y-auto p-4">
+      <LogoBackground />
+
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="relative z-10 w-full max-w-sm"
+      >
+        {/* Header */}
+        <div className="text-center mb-6">
+          <h1 className="text-3xl font-display font-bold glow-text bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+            NEXURA Premium
+          </h1>
+          <p className="text-muted-foreground mt-1">Unlock unlimited AI access</p>
+        </div>
+
+        <div className="glass rounded-2xl border border-primary/30 glow-border overflow-hidden">
+          {/* Price badge */}
+          <div className="bg-gradient-to-r from-primary/20 to-accent/20 px-6 py-4 border-b border-primary/20 text-center">
+            <span className="text-4xl font-display font-bold text-white">₹10</span>
+            <span className="text-muted-foreground ml-2">/ Day</span>
           </div>
-          
-          <CardContent className="p-8 space-y-8">
+
+          <div className="p-6 space-y-6">
             {status === "approved" ? (
-              <div className="space-y-4 py-8">
-                <CheckCircle className="w-16 h-16 text-green-500 mx-auto" />
-                <h3 className="text-2xl font-bold text-green-500">Access Granted</h3>
-                <p className="text-muted-foreground">Your daily pass is active.</p>
+              <div className="text-center space-y-3 py-4">
+                <CheckCircle className="w-16 h-16 text-green-400 mx-auto" />
+                <h3 className="text-xl font-bold text-green-400">Access Granted!</h3>
+                <p className="text-muted-foreground text-sm">Your daily pass is active.</p>
+                {statusData?.expiresAt && (
+                  <p className="text-xs text-muted-foreground">
+                    Expires: {new Date(statusData.expiresAt).toLocaleString()}
+                  </p>
+                )}
               </div>
             ) : status === "pending" ? (
-              <div className="space-y-4 py-8">
-                <Clock className="w-16 h-16 text-yellow-500 mx-auto animate-pulse" />
-                <h3 className="text-2xl font-bold text-yellow-500">Verification Pending</h3>
-                <p className="text-muted-foreground">Admin is reviewing your UTR number.</p>
+              <div className="text-center space-y-3 py-4">
+                <Clock className="w-16 h-16 text-yellow-400 mx-auto animate-pulse" />
+                <h3 className="text-xl font-bold text-yellow-400">Pending Approval</h3>
+                <p className="text-muted-foreground text-sm">Admin is verifying your payment.</p>
+                <p className="text-xs text-muted-foreground">UTR: {statusData?.utrNumber}</p>
+              </div>
+            ) : status === "expired" ? (
+              <div className="text-center space-y-3 py-4">
+                <XCircle className="w-16 h-16 text-red-400 mx-auto" />
+                <h3 className="text-xl font-bold text-red-400">Pass Expired</h3>
+                <p className="text-muted-foreground text-sm">Scan again to renew your daily pass.</p>
               </div>
             ) : (
               <>
-                <div className="aspect-square max-w-[200px] mx-auto bg-white rounded-xl p-4 flex items-center justify-center relative">
-                  {/* Placeholder for QR Code */}
-                  <QrCode className="w-full h-full text-black opacity-20" />
-                  <div className="absolute inset-0 flex items-center justify-center font-bold text-black text-xl">
-                    SCAN QR
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <div className="space-y-2 text-left">
-                    <label className="text-sm font-medium text-muted-foreground">UTR Reference Number</label>
-                    <Input
-                      value={utr}
-                      onChange={(e) => setUtr(e.target.value)}
-                      placeholder="Enter 12-digit UTR..."
-                      className="bg-black/40 border-primary/30 text-center tracking-widest text-lg"
+                {/* QR Code centred */}
+                <div className="flex flex-col items-center gap-3">
+                  <p className="text-xs text-muted-foreground font-mono uppercase tracking-widest">Scan to Pay ₹10</p>
+                  <div className="bg-white rounded-2xl p-4 shadow-[0_0_30px_rgba(0,212,255,0.3)]">
+                    <QRCodeSVG
+                      value={UPI_URI}
+                      size={200}
+                      level="H"
+                      includeMargin={false}
                     />
                   </div>
-                  <Button 
-                    onClick={handleSubmit} 
-                    disabled={!utr.trim() || submitPayment.isPending}
-                    className="w-full bg-primary hover:bg-primary/80 text-black font-bold py-6 text-lg"
+                  <div className="text-center">
+                    <p className="text-primary font-mono font-bold text-lg">₹10.00</p>
+                    <p className="text-xs text-muted-foreground">NEXURA Daily Pass</p>
+                    <p className="text-xs text-muted-foreground mt-1">UPI: {UPI_ID}</p>
+                  </div>
+                  <Button
+                    asChild
+                    className="w-full bg-gradient-to-r from-primary to-accent hover:opacity-90 text-black font-bold py-5"
                   >
-                    Submit Payment
+                    <a href={UPI_URI} data-testid="button-pay-upi">
+                      Pay ₹10 Now
+                    </a>
                   </Button>
+                </div>
+
+                <div className="border-t border-border/40 pt-5 space-y-3">
+                  <p className="text-xs text-center text-muted-foreground">After payment, enter your UTR reference</p>
+                  <Input
+                    value={utr}
+                    onChange={(e) => setUtr(e.target.value)}
+                    placeholder="Enter UTR / Transaction ID..."
+                    data-testid="input-utr"
+                    className="bg-black/40 border-primary/30 text-center tracking-widest"
+                  />
+                  <Button
+                    onClick={handleSubmit}
+                    disabled={!utr.trim() || submitPayment.isPending}
+                    data-testid="button-submit-utr"
+                    className="w-full border border-primary/40 bg-primary/10 hover:bg-primary/20 text-primary font-semibold"
+                  >
+                    {submitPayment.isPending ? "Submitting..." : "Submit for Approval"}
+                  </Button>
+                  <p className="text-xs text-center text-muted-foreground">
+                    Admin will verify and activate your 24-hour pass
+                  </p>
                 </div>
               </>
             )}
-          </CardContent>
-        </Card>
-      </div>
+          </div>
+        </div>
+      </motion.div>
     </div>
   );
 }
