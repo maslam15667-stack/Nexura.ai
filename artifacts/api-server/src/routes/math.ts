@@ -3,6 +3,7 @@ import { db } from "@workspace/db";
 import { settingsTable } from "@workspace/db";
 import { SolveMathBody, SolveMathResponse } from "@workspace/api-zod";
 import { logger } from "../lib/logger";
+import { callGeminiWithFallback } from "../lib/gemini";
 
 const router: IRouter = Router();
 
@@ -38,47 +39,15 @@ router.post("/math/solve", async (req, res): Promise<void> => {
 
 Respond ONLY with valid JSON, no markdown, no code blocks.`;
 
-    let requestBody: object;
-
-    if (imageBase64) {
-      requestBody = {
-        contents: [{
-          parts: [
-            { text: systemPrompt + "\n\nSolve the math problem shown in this image:" },
-            {
-              inline_data: {
-                mime_type: "image/jpeg",
-                data: imageBase64,
-              }
-            }
-          ]
-        }],
-        generationConfig: { responseMimeType: "application/json" },
-      };
-    } else {
-      requestBody = {
-        contents: [{ parts: [{ text: systemPrompt + `\n\nProblem: ${problem}` }] }],
-        generationConfig: { responseMimeType: "application/json" },
-      };
-    }
-
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(requestBody),
-      }
-    );
-
-    if (!response.ok) {
-      const errText = await response.text();
-      logger.error({ status: response.status, body: errText }, "Gemini math error");
-      throw new Error(`Gemini error: ${response.status}`);
-    }
-
-    const data = await response.json() as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
-    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "{}";
+    const text = await callGeminiWithFallback({
+      prompt: imageBase64
+        ? systemPrompt + "\n\nSolve the math problem shown in this image:"
+        : systemPrompt + `\n\nProblem: ${problem}`,
+      jsonMode: true,
+      imageParts: imageBase64
+        ? [{ inline_data: { mime_type: "image/jpeg", data: imageBase64 } }]
+        : undefined,
+    }, apiKey);
 
     let parsedSolution: { steps?: unknown; answer?: unknown; latex?: unknown } = {};
     try {
@@ -94,8 +63,9 @@ Respond ONLY with valid JSON, no markdown, no code blocks.`;
     }));
   } catch (err) {
     logger.error({ err }, "Math solver failed");
+    const msg = err instanceof Error ? err.message : "Error solving the problem. Please try again.";
     res.json(SolveMathResponse.parse({
-      steps: ["Error solving the problem. Please check your API key and try again."],
+      steps: [msg],
       answer: "Error",
       latex: null,
     }));
