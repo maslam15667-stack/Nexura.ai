@@ -4,14 +4,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CheckCircle, Clock, XCircle } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { QRCodeSVG } from "qrcode.react";
 import { LogoBackground } from "@/components/LogoBackground";
 import { motion } from "framer-motion";
 
-const UPI_ID = "nexura@ybl";
-const UPI_NAME = "NEXURA AI";
-const AMOUNT = "10";
-const UPI_URI = `upi://pay?pa=${UPI_ID}&pn=${encodeURIComponent(UPI_NAME)}&am=${AMOUNT}&cu=INR&tn=${encodeURIComponent("NEXURA Daily Pass")}`;
+const UPI_ID = "maslam15667@okaxis";
+const UPI_NAME = "Mohammed Aslam";
+const UPI_URI = `upi://pay?pa=${UPI_ID}&pn=${encodeURIComponent(UPI_NAME)}&am=10&cu=INR&tn=${encodeURIComponent("NEXURA Daily Pass")}`;
 
 export default function Payment() {
   const [utr, setUtr] = useState("");
@@ -84,25 +82,30 @@ export default function Payment() {
               </div>
             ) : (
               <>
-                {/* QR Code centred */}
+                {/* QR Code — actual image centred */}
                 <div className="flex flex-col items-center gap-3">
                   <p className="text-xs text-muted-foreground font-mono uppercase tracking-widest">Scan to Pay ₹10</p>
-                  <div className="bg-white rounded-2xl p-4 shadow-[0_0_30px_rgba(0,212,255,0.3)]">
-                    <QRCodeSVG
-                      value={UPI_URI}
-                      size={200}
-                      level="H"
-                      includeMargin={false}
-                    />
-                  </div>
+
+                  <a href={UPI_URI} className="block">
+                    <div className="bg-white rounded-2xl p-3 shadow-[0_0_30px_rgba(0,212,255,0.3)] hover:shadow-[0_0_40px_rgba(0,212,255,0.5)] transition-shadow">
+                      <img
+                        src="/upi-qr.jpeg"
+                        alt="UPI QR Code — Mohammed Aslam"
+                        className="w-52 h-52 object-contain rounded-xl"
+                        data-testid="img-upi-qr"
+                      />
+                    </div>
+                  </a>
+
                   <div className="text-center">
-                    <p className="text-primary font-mono font-bold text-lg">₹10.00</p>
+                    <p className="text-primary font-mono font-bold text-xl">₹10.00</p>
                     <p className="text-xs text-muted-foreground">NEXURA Daily Pass</p>
-                    <p className="text-xs text-muted-foreground mt-1">UPI: {UPI_ID}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">UPI: {UPI_ID}</p>
                   </div>
+
                   <Button
                     asChild
-                    className="w-full bg-gradient-to-r from-primary to-accent hover:opacity-90 text-black font-bold py-5"
+                    className="w-full bg-gradient-to-r from-primary to-accent hover:opacity-90 text-black font-bold py-5 text-base"
                   >
                     <a href={UPI_URI} data-testid="button-pay-upi">
                       Pay ₹10 Now
@@ -111,7 +114,9 @@ export default function Payment() {
                 </div>
 
                 <div className="border-t border-border/40 pt-5 space-y-3">
-                  <p className="text-xs text-center text-muted-foreground">After payment, enter your UTR reference</p>
+                  <p className="text-xs text-center text-muted-foreground">
+                    After payment, enter your UTR reference number
+                  </p>
                   <Input
                     value={utr}
                     onChange={(e) => setUtr(e.target.value)}
