@@ -1,0 +1,94 @@
+Build NEXURA - Next Gen AI App. Full working app with all features.
+
+**1. BRANDING & DESIGN**
+- App name: NEXURA 
+- Tagline: Your Next Gen AI Companion
+- Logo: Use uploaded NEXURA logo with neon blue to purple gradient "N" and "A NXT GEN AI" text
+- Theme: Dark #0A0A0F background, glassmorphism cards, neon blue #00D4FF + purple #8B5CF6 gradient borders
+- Font: Inter/Space Grotesk. Mobile first responsive + PWA
+- Animation: Fade in, glow effect, smooth transitions
+
+**2. HOMEPAGE LAYOUT**
+- Center screen: Logo with glow effect, 35% width, max 280px. Below: tagline
+- Click any sidebar item → logo fades out → feature loads
+- Bottom nav mobile: Home, Chat, Voice, Profile
+
+**3. LEFT SIDEBAR - ChatGPT Style** 
+Open by default on desktop, menu icon on mobile. Only headings + icons, no description:
+1. AI Chat
+2. Anime Mode
+3. Math Solver
+4. Web Search
+5. Image Gen
+6. UPI Payment
+7. Prompt Lab
+8. AI Voice Call
+9. Settings
+Bottom: "New Chat" button
+
+**4. FEATURES - UI + FUNCTIONALITY READY**
+
+1. AI Chat:
+- ChatGPT style chat box bottom center
+- Input field + Send button
+- Connect Gemini 2.5 Flash API. Auto detect user language Tamil/English/Hindi/Malayalam/Japanese/Spanish/French/Arabic/etc and reply same language
+- Placeholder: "Message NEXURA..."
+
+2. Anime Mode:
+- Dropdown: Tsundere, Waifu, Senpai, Villain, Yandere, Kuudere
+- Selected character changes AI personality + dialogue style
+- Show character avatar + name
+
+3. Math Solver:
+- Input box for math problem
+- Button: "Solve Step by Step"
+- Output area showing steps like Wolfram Alpha. Support algebra, calculus, geometry, trigonometry, statistics, word problems
+
+4. Web Search:
+- Search bar
+- Button: "Search Web"
+- Connect Tavily API
+- Show results with title, snippet, source link like Perplexity
+
+5. Image Gen:
+- Text prompt input
+- Style dropdown: Anime, Realistic, Cartoon, 3D
+- Button: "Generate Image"
+- Connect Stable Diffusion/Flux API
+- Grid to show generated images
+
+6. UPI Payment:
+- Page: ₹10 Daily Pass
+- Show UPI QR code placeholder
+- Input: UTR number
+- Button: "Submit for Approval"
+- Text: "Admin will approve. 24 hour timer starts after approval"
+
+7. Prompt Lab - Page 8:
+- "Create New Prompt" button + input fields: Name, Prompt text
+- Grid showing saved prompts with edit/delete
+- Pre-load 20 prompts: Write Resume, YouTube Script, Exam Notes, Debug Code, Write Email, Study Plan, etc
+
+8. AI Voice Call - Page 9:
+- Big mic button center
+- Character selector dropdown: Tsundere, Waifu, Senpai, Villain, Yandere, Kuudere
+- Voice Type selector dropdown: Soft, Angry, Cute, Deep, Whisper, Energetic, Calm
+- Language selector: Auto detect / Tamil / English / Hindi / Malayalam / Japanese
+- Status text: "Tap to speak" 
+- Connect ElevenLabs or Gemini TTS API
+- Logic: Combine Character + Voice Type + Language to generate AI voice
+- Example: Tsundere + Angry + Tamil = "Hmph! Enna venum ippo?!" in angry tone
+- Example: Waifu + Soft + English = "Welcome back, master~" in soft tone
+- Show current voice settings above mic button
+
+9. Settings:
+- API Keys section: Gemini API Key, ElevenLabs API Key, Tavily API Key
+- Theme toggle
+- Logout
+
+**5. TECH RULES**
+- Use React + Tailwind CSS
+- All API calls via environment variables
+- Add placeholder for API keys in Settings
+- Mobile responsive, PWA manifest
+- Sidebar toggle for mobile

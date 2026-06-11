@@ -1,22 +1,27 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: NEXURA AI App API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
-    description: Health operations
+  - name: chat
+  - name: math
+  - name: search
+  - name: image
+  - name: payment
+  - name: prompts
+  - name: voice
+  - name: settings
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +29,258 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /chat/send:
+    post:
+      operationId: sendChatMessage
+      tags: [chat]
+      summary: Send a chat message and get AI reply
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatMessageInput"
+      responses:
+        "200":
+          description: AI reply
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatReply"
+
+  /chat/history:
+    get:
+      operationId: getChatHistory
+      tags: [chat]
+      summary: Get chat history for a session
+      parameters:
+        - in: query
+          name: sessionId
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Chat history
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ChatMessage"
+
+  /math/solve:
+    post:
+      operationId: solveMath
+      tags: [math]
+      summary: Solve a math problem step by step
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MathInput"
+      responses:
+        "200":
+          description: Step-by-step solution
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MathSolution"
+
+  /search:
+    post:
+      operationId: webSearch
+      tags: [search]
+      summary: Search the web using Tavily
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SearchInput"
+      responses:
+        "200":
+          description: Search results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchResults"
+
+  /image/generate:
+    post:
+      operationId: generateImage
+      tags: [image]
+      summary: Generate an image from a prompt
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ImageGenInput"
+      responses:
+        "200":
+          description: Generated image URLs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImageGenResult"
+
+  /payment/submit:
+    post:
+      operationId: submitPayment
+      tags: [payment]
+      summary: Submit UPI payment UTR for approval
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PaymentInput"
+      responses:
+        "200":
+          description: Submission result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentStatus"
+
+  /payment/status:
+    get:
+      operationId: getPaymentStatus
+      tags: [payment]
+      summary: Get payment/subscription status
+      responses:
+        "200":
+          description: Payment status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentStatus"
+
+  /prompts:
+    get:
+      operationId: listPrompts
+      tags: [prompts]
+      summary: List all saved prompts
+      responses:
+        "200":
+          description: List of prompts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Prompt"
+    post:
+      operationId: createPrompt
+      tags: [prompts]
+      summary: Create a new prompt
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PromptInput"
+      responses:
+        "201":
+          description: Created prompt
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Prompt"
+
+  /prompts/{id}:
+    patch:
+      operationId: updatePrompt
+      tags: [prompts]
+      summary: Update a prompt
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PromptUpdate"
+      responses:
+        "200":
+          description: Updated prompt
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Prompt"
+    delete:
+      operationId: deletePrompt
+      tags: [prompts]
+      summary: Delete a prompt
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteResult"
+
+  /voice/speak:
+    post:
+      operationId: voiceSpeak
+      tags: [voice]
+      summary: Generate AI voice audio from text
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VoiceInput"
+      responses:
+        "200":
+          description: Voice audio result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VoiceResult"
+
+  /settings:
+    get:
+      operationId: getSettings
+      tags: [settings]
+      summary: Get current settings (non-sensitive)
+      responses:
+        "200":
+          description: Settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Settings"
+    post:
+      operationId: saveSettings
+      tags: [settings]
+      summary: Save settings including API keys
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SettingsInput"
+      responses:
+        "200":
+          description: Saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Settings"
+
 components:
   schemas:
     HealthStatus:
@@ -31,6 +288,219 @@ components:
       properties:
         status:
           type: string
-      required:
-        - status
+      required: [status]
 
+    ChatMessageInput:
+      type: object
+      required: [message, mode]
+      properties:
+        message:
+          type: string
+        mode:
+          type: string
+          description: "normal | tsundere | waifu | senpai | villain | yandere | kuudere"
+        sessionId:
+          type: ["string", "null"]
+
+    ChatReply:
+      type: object
+      required: [reply, sessionId]
+      properties:
+        reply:
+          type: string
+        sessionId:
+          type: string
+
+    ChatMessage:
+      type: object
+      required: [id, role, content, createdAt]
+      properties:
+        id:
+          type: integer
+        role:
+          type: string
+        content:
+          type: string
+        sessionId:
+          type: string
+        createdAt:
+          type: string
+
+    MathInput:
+      type: object
+      required: [problem]
+      properties:
+        problem:
+          type: string
+
+    MathSolution:
+      type: object
+      required: [steps, answer]
+      properties:
+        steps:
+          type: array
+          items:
+            type: string
+        answer:
+          type: string
+        latex:
+          type: ["string", "null"]
+
+    SearchInput:
+      type: object
+      required: [query]
+      properties:
+        query:
+          type: string
+
+    SearchResult:
+      type: object
+      required: [title, snippet, url]
+      properties:
+        title:
+          type: string
+        snippet:
+          type: string
+        url:
+          type: string
+
+    SearchResults:
+      type: object
+      required: [results]
+      properties:
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/SearchResult"
+
+    ImageGenInput:
+      type: object
+      required: [prompt, style]
+      properties:
+        prompt:
+          type: string
+        style:
+          type: string
+          description: "anime | realistic | cartoon | 3d"
+
+    ImageGenResult:
+      type: object
+      required: [images]
+      properties:
+        images:
+          type: array
+          items:
+            type: string
+          description: Array of image URLs or base64 data
+
+    PaymentInput:
+      type: object
+      required: [utrNumber]
+      properties:
+        utrNumber:
+          type: string
+
+    PaymentStatus:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          description: "pending | approved | expired | none"
+        approvedAt:
+          type: ["string", "null"]
+        expiresAt:
+          type: ["string", "null"]
+        utrNumber:
+          type: ["string", "null"]
+
+    Prompt:
+      type: object
+      required: [id, name, text, isPreset, createdAt]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        text:
+          type: string
+        isPreset:
+          type: boolean
+        createdAt:
+          type: string
+
+    PromptInput:
+      type: object
+      required: [name, text]
+      properties:
+        name:
+          type: string
+        text:
+          type: string
+
+    PromptUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        text:
+          type: string
+
+    DeleteResult:
+      type: object
+      required: [success]
+      properties:
+        success:
+          type: boolean
+
+    VoiceInput:
+      type: object
+      required: [text, character, voiceType, language]
+      properties:
+        text:
+          type: string
+        character:
+          type: string
+          description: "tsundere | waifu | senpai | villain | yandere | kuudere"
+        voiceType:
+          type: string
+          description: "soft | angry | cute | deep | whisper | energetic | calm"
+        language:
+          type: string
+          description: "auto | tamil | english | hindi | malayalam | japanese"
+
+    VoiceResult:
+      type: object
+      required: [audioUrl, characterResponse]
+      properties:
+        audioUrl:
+          type: ["string", "null"]
+        characterResponse:
+          type: string
+        language:
+          type: string
+
+    Settings:
+      type: object
+      required: [hasGeminiKey, hasElevenLabsKey, hasTavilyKey, theme]
+      properties:
+        hasGeminiKey:
+          type: boolean
+        hasElevenLabsKey:
+          type: boolean
+        hasTavilyKey:
+          type: boolean
+        theme:
+          type: string
+
+    SettingsInput:
+      type: object
+      properties:
+        geminiApiKey:
+          type: ["string", "null"]
+        elevenLabsApiKey:
+          type: ["string", "null"]
+        tavilyApiKey:
+          type: ["string", "null"]
+        theme:
+          type: ["string", "null"]

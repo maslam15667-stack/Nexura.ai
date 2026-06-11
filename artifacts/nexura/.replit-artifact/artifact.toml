@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "NEXURA"
+version = "1.0.0"
+id = "artifacts/nexura"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 25767
+
+[services.development]
+run = "pnpm --filter @workspace/nexura run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/nexura", "run", "build" ]
+publicDir = "artifacts/nexura/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "25767"
+BASE_PATH = "/"
