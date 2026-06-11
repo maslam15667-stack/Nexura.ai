@@ -8,8 +8,9 @@ import { callGeminiWithFallback } from "../lib/gemini";
 const router: IRouter = Router();
 
 async function getGeminiApiKey(): Promise<string | null> {
+  if (process.env.GEMINI_API_KEY) return process.env.GEMINI_API_KEY;
   const [settings] = await db.select().from(settingsTable).limit(1);
-  return settings?.geminiApiKey ?? process.env.GEMINI_API_KEY ?? null;
+  return settings?.geminiApiKey ?? null;
 }
 
 router.post("/math/solve", async (req, res): Promise<void> => {

@@ -10,8 +10,8 @@ const router: IRouter = Router();
 async function getSettings(): Promise<{ geminiKey: string | null; elevenLabsKey: string | null }> {
   const [settings] = await db.select().from(settingsTable).limit(1);
   return {
-    geminiKey: settings?.geminiApiKey ?? process.env.GEMINI_API_KEY ?? null,
-    elevenLabsKey: settings?.elevenLabsApiKey ?? process.env.ELEVEN_LABS_API_KEY ?? null,
+    geminiKey: process.env.GEMINI_API_KEY ?? settings?.geminiApiKey ?? null,
+    elevenLabsKey: process.env.ELEVEN_LABS_API_KEY ?? settings?.elevenLabsApiKey ?? null,
   };
 }
 

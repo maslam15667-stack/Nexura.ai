@@ -24,8 +24,9 @@ const CHARACTER_PROMPTS: Record<string, string> = {
 };
 
 async function getGeminiApiKey(): Promise<string | null> {
+  if (process.env.GEMINI_API_KEY) return process.env.GEMINI_API_KEY;
   const [settings] = await db.select().from(settingsTable).limit(1);
-  return settings?.geminiApiKey ?? process.env.GEMINI_API_KEY ?? null;
+  return settings?.geminiApiKey ?? null;
 }
 
 router.post("/chat/send", async (req, res): Promise<void> => {
