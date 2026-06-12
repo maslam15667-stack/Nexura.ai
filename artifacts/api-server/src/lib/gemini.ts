@@ -7,9 +7,11 @@ const GEMINI_MODELS = [
 ];
 
 const OPENROUTER_MODELS = [
-  "google/gemini-2.0-flash-exp:free",
-  "google/gemini-flash-1.5-8b:free",
+  "google/gemma-4-31b-it:free",
+  "nvidia/nemotron-3-nano-30b-a3b:free",
   "meta-llama/llama-3.3-70b-instruct:free",
+  "meta-llama/llama-3.2-3b-instruct:free",
+  "google/gemma-4-26b-a4b-it:free",
 ];
 
 export interface GeminiRequest {
@@ -67,10 +69,6 @@ async function callOpenRouter(req: GeminiRequest, apiKey: string): Promise<strin
     }
 
     const status = response.status;
-    if (status === 429) {
-      logger.warn({ model }, `OpenRouter quota hit on ${model}, trying next`);
-      continue;
-    }
     if (status === 401 || status === 403) {
       throw new Error("Your OpenRouter API key is invalid. Please update it in Settings.");
     }
