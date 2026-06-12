@@ -1,14 +1,24 @@
 import { Router, type IRouter } from "express";
-import { db } from "@workspace/db";
-import { settingsTable } from "@workspace/db";
 import { WebSearchBody, WebSearchResponse } from "@workspace/api-zod";
 import { logger } from "../lib/logger";
+import { callGeminiWithFallback } from "../lib/gemini";
 
 const router: IRouter = Router();
 
-async function getTavilyApiKey(): Promise<string | null> {
-  const [settings] = await db.select().from(settingsTable).limit(1);
-  return settings?.tavilyApiKey ?? process.env.TAVILY_API_KEY ?? null;
+function extractJsonArray(text: string): { title: string; url: string; snippet: string }[] {
+  let clean = text.trim();
+  // Strip markdown code fences
+  clean = clean.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
+  // Find first [ ... ] block
+  const start = clean.indexOf("[");
+  const end   = clean.lastIndexOf("]");
+  if (start === -1 || end === -1) return [];
+  try {
+    const arr = JSON.parse(clean.slice(start, end + 1));
+    return Array.isArray(arr) ? arr : [];
+  } catch {
+    return [];
+  }
 }
 
 router.post("/search", async (req, res): Promise<void> => {
@@ -19,49 +29,44 @@ router.post("/search", async (req, res): Promise<void> => {
   }
 
   const { query } = parsed.data;
-  const apiKey = await getTavilyApiKey();
+  const openRouterKey = process.env.OPENROUTER_API_KEY ?? process.env.GEMINI_API_KEY;
 
-  if (!apiKey) {
+  if (!openRouterKey) {
     res.json(WebSearchResponse.parse({
-      results: [
-        {
-          title: "Tavily API Key Required",
-          snippet: "Please configure your Tavily API key in Settings to use Web Search.",
-          url: "https://tavily.com",
-        },
-      ],
+      results: [{ title: "AI key not configured", snippet: "Please contact the admin.", url: "" }],
     }));
     return;
   }
 
   try {
-    const response = await fetch("https://api.tavily.com/search", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        api_key: apiKey,
-        query,
-        search_depth: "basic",
-        max_results: 8,
-      }),
-    });
+    const aiText = await callGeminiWithFallback({
+      system: `You are a web search engine assistant. Return ONLY a JSON array of 6 search results for any query.
+Format: [{"title":"Page title","url":"https://example.com/page","snippet":"2-3 sentence description of what the page covers."}]
+Rules: Use real website domains. Be accurate and helpful. No markdown, no explanation, ONLY the JSON array.`,
+      prompt: query,
+    }, openRouterKey);
 
-    if (!response.ok) {
-      throw new Error(`Tavily error: ${response.status}`);
+    const results = extractJsonArray(aiText);
+
+    if (results.length > 0) {
+      res.json(WebSearchResponse.parse({
+        results: results.slice(0, 8).map(r => ({
+          title:   String(r.title   ?? "Result"),
+          snippet: String(r.snippet ?? ""),
+          url:     String(r.url     ?? ""),
+        })),
+      }));
+      return;
     }
 
-    const data = await response.json() as { results?: { title?: string; content?: string; url?: string }[] };
-    const results = (data.results ?? []).map(r => ({
-      title: r.title ?? "No title",
-      snippet: r.content ?? "",
-      url: r.url ?? "",
-    }));
-
-    res.json(WebSearchResponse.parse({ results }));
-  } catch (err) {
-    logger.error({ err }, "Web search failed");
+    // Fallback: return AI answer as single result
     res.json(WebSearchResponse.parse({
-      results: [{ title: "Search failed", snippet: "An error occurred during the search.", url: "" }],
+      results: [{ title: `AI Answer: ${query}`, snippet: aiText.slice(0, 500), url: "" }],
+    }));
+  } catch (err) {
+    logger.error({ err }, "AI web search failed");
+    res.json(WebSearchResponse.parse({
+      results: [{ title: "Search failed", snippet: "AI is temporarily unavailable. Please try again shortly.", url: "" }],
     }));
   }
 });
