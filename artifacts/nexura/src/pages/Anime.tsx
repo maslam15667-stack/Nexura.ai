@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useGetChatHistory, getGetChatHistoryQueryKey, useSendChatMessage } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -65,11 +65,119 @@ const CHARACTERS = [
   },
 ];
 
+type Character = typeof CHARACTERS[0];
+
+/* ── Helpers for tracking read state ── */
+function getReadCount(charId: string): number {
+  return parseInt(localStorage.getItem(`nexura_read_${charId}`) ?? "0", 10);
+}
+function setReadCount(charId: string, n: number) {
+  localStorage.setItem(`nexura_read_${charId}`, String(n));
+}
+
+/* ── Single card that fetches its own history ── */
+function CharacterCard({
+  char,
+  index,
+  onSelect,
+}: {
+  char: Character;
+  index: number;
+  onSelect: (c: Character) => void;
+}) {
+  const sessionId = `anime-${char.id}`;
+  const { data: history = [] } = useGetChatHistory(
+    { sessionId },
+    {
+      query: {
+        queryKey: getGetChatHistoryQueryKey({ sessionId }),
+        refetchInterval: 8000,
+      },
+    }
+  );
+
+  const [readCount, setLocalRead] = useState(() => getReadCount(char.id));
+
+  const aiMessages = history.filter(m => m.role === "assistant").length;
+  const unread = Math.max(0, aiMessages - readCount);
+
+  const handleClick = () => {
+    setReadCount(char.id, aiMessages);
+    setLocalRead(aiMessages);
+    onSelect(char);
+  };
+
+  /* Sync if another card chat updated the count */
+  useEffect(() => {
+    setLocalRead(getReadCount(char.id));
+  }, [char.id]);
+
+  return (
+    <motion.button
+      key={char.id}
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.07 }}
+      onClick={handleClick}
+      className={`relative overflow-hidden rounded-2xl border ${char.border} text-left group`}
+      style={{ boxShadow: `0 0 20px ${char.glow}` }}
+    >
+      {/* Background */}
+      <div className={`absolute inset-0 bg-gradient-to-br ${char.gradient} opacity-80`} />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+
+      {/* Unread badge */}
+      <AnimatePresence>
+        {unread > 0 && (
+          <motion.div
+            initial={{ scale: 0, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0, opacity: 0 }}
+            className="absolute top-2.5 right-2.5 z-20 flex items-center justify-center"
+          >
+            <motion.div
+              animate={{ scale: [1, 1.15, 1] }}
+              transition={{ duration: 1.2, repeat: Infinity }}
+              className="min-w-[22px] h-[22px] px-1.5 rounded-full bg-white text-black text-[11px] font-bold flex items-center justify-center shadow-lg"
+              style={{ boxShadow: `0 0 10px ${char.glow}, 0 0 4px rgba(255,255,255,0.8)` }}
+            >
+              {unread > 99 ? "99+" : unread}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Content */}
+      <div className="relative z-10 flex flex-col h-44">
+        <div className="flex-1 flex items-center justify-center">
+          <span className="text-6xl drop-shadow-lg select-none" style={{ filter: "drop-shadow(0 4px 12px rgba(0,0,0,0.5))" }}>
+            {char.emoji}
+          </span>
+        </div>
+
+        <div className="p-3 space-y-0.5">
+          <div className="flex items-center justify-between">
+            <span className="font-display font-bold text-white text-sm">{char.label}</span>
+            <span className="text-xs text-white/50 flex items-center gap-1">
+              <MessageCircle className="w-3 h-3" />{char.chats}
+            </span>
+          </div>
+          <p className="text-white/70 text-xs leading-tight line-clamp-2">{char.tagline}</p>
+        </div>
+      </div>
+
+      {/* Hover overlay */}
+      <div className="absolute inset-0 bg-white/0 group-hover:bg-white/5 transition-colors" />
+    </motion.button>
+  );
+}
+
+/* ── Main page ── */
 export default function Anime() {
-  const [selected, setSelected]   = useState<typeof CHARACTERS[0] | null>(null);
-  const [message, setMessage]     = useState("");
-  const scrollRef                 = useRef<HTMLDivElement>(null);
-  const queryClient               = useQueryClient();
+  const [selected, setSelected] = useState<Character | null>(null);
+  const [message, setMessage]   = useState("");
+  const scrollRef               = useRef<HTMLDivElement>(null);
+  const queryClient             = useQueryClient();
 
   const sessionId = selected ? `anime-${selected.id}` : "";
   const { data: history = [] } = useGetChatHistory(
@@ -78,20 +186,38 @@ export default function Anime() {
   );
   const sendMsg = useSendChatMessage();
 
+  /* Mark as read and open chat */
+  const handleSelect = useCallback((char: Character) => {
+    const sessionId = `anime-${char.id}`;
+    const cached = queryClient.getQueryData<typeof history>(getGetChatHistoryQueryKey({ sessionId })) ?? [];
+    const aiCount = cached.filter(m => m.role === "assistant").length;
+    setReadCount(char.id, aiCount);
+    setSelected(char);
+  }, [queryClient]);
+
   const handleSend = () => {
     if (!message.trim() || !selected) return;
     const cur = message;
     setMessage("");
     sendMsg.mutate({ data: { message: cur, mode: selected.id, sessionId } }, {
-      onSuccess: () => queryClient.invalidateQueries({ queryKey: getGetChatHistoryQueryKey({ sessionId }) }),
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getGetChatHistoryQueryKey({ sessionId }) });
+      },
     });
   };
+
+  /* When new AI message arrives in open chat, mark it as read immediately */
+  useEffect(() => {
+    if (!selected) return;
+    const aiCount = history.filter(m => m.role === "assistant").length;
+    setReadCount(selected.id, aiCount);
+  }, [history, selected]);
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [history, sendMsg.isPending]);
 
-  /* ── Character Grid ── */
+  /* ── Grid view ── */
   if (!selected) {
     return (
       <div className="flex flex-col h-full relative overflow-y-auto">
@@ -109,43 +235,7 @@ export default function Anime() {
 
           <div className="grid grid-cols-2 gap-3">
             {CHARACTERS.map((char, i) => (
-              <motion.button
-                key={char.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.07 }}
-                onClick={() => setSelected(char)}
-                className={`relative overflow-hidden rounded-2xl border ${char.border} text-left group`}
-                style={{ boxShadow: `0 0 20px ${char.glow}` }}
-              >
-                {/* Card gradient background */}
-                <div className={`absolute inset-0 bg-gradient-to-br ${char.gradient} opacity-80`} />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-
-                {/* Decorative emoji art */}
-                <div className="relative z-10 flex flex-col h-44">
-                  {/* Big emoji centered */}
-                  <div className="flex-1 flex items-center justify-center">
-                    <span className="text-6xl drop-shadow-lg select-none" style={{ filter: "drop-shadow(0 4px 12px rgba(0,0,0,0.5))" }}>
-                      {char.emoji}
-                    </span>
-                  </div>
-
-                  {/* Info at bottom */}
-                  <div className="p-3 space-y-0.5">
-                    <div className="flex items-center justify-between">
-                      <span className="font-display font-bold text-white text-sm">{char.label}</span>
-                      <span className="text-xs text-white/50 flex items-center gap-1">
-                        <MessageCircle className="w-3 h-3" />{char.chats}
-                      </span>
-                    </div>
-                    <p className="text-white/70 text-xs leading-tight line-clamp-2">{char.tagline}</p>
-                  </div>
-                </div>
-
-                {/* Hover overlay */}
-                <div className="absolute inset-0 bg-white/0 group-hover:bg-white/5 transition-colors" />
-              </motion.button>
+              <CharacterCard key={char.id} char={char} index={i} onSelect={handleSelect} />
             ))}
           </div>
         </div>
@@ -153,14 +243,17 @@ export default function Anime() {
     );
   }
 
-  /* ── Chat View ── */
+  /* ── Chat view ── */
   return (
     <div className="flex flex-col h-full relative">
       <LogoBackground />
 
       {/* Header */}
       <div className="relative z-10 p-3 border-b border-border/50 glass flex items-center gap-3">
-        <button onClick={() => setSelected(null)} className="p-2 rounded-xl hover:bg-white/5 text-muted-foreground hover:text-white transition-colors">
+        <button
+          onClick={() => setSelected(null)}
+          className="p-2 rounded-xl hover:bg-white/5 text-muted-foreground hover:text-white transition-colors"
+        >
           <ArrowLeft className="w-5 h-5" />
         </button>
         <div
