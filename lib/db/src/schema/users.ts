@@ -1,5 +1,4 @@
-import { pgTable, text, serial, timestamp } from "drizzle-orm/pg-core";
-import { z } from "zod/v4";
+import { pgTable, text, serial, timestamp, boolean, integer } from "drizzle-orm/pg-core";
 
 export const usersTable = pgTable("users", {
   id: serial("id").primaryKey(),
@@ -7,6 +6,9 @@ export const usersTable = pgTable("users", {
   email: text("email").notNull().unique(),
   password: text("password").notNull(),
   token: text("token"),
+  isPremium: boolean("is_premium").notNull().default(false),
+  dailyChatCount: integer("daily_chat_count").notNull().default(0),
+  lastChatDate: text("last_chat_date").notNull().default(""),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

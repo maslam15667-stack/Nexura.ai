@@ -2,7 +2,7 @@ import React from "react";
 import { Link, useLocation } from "wouter";
 import {
   MessageSquare, Home, Sparkles, Plus, Image as ImageIcon, Search,
-  Calculator, Mic, CreditCard, Settings, TerminalSquare, Zap, Menu, X
+  Calculator, Mic, CreditCard, Settings, TerminalSquare, Zap, Menu, X, User, Crown
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { ScrollArea } from "./ui/scroll-area";
@@ -15,9 +15,10 @@ const SIDEBAR_ITEMS = [
   { href: "/math", label: "Math Solver", icon: Calculator },
   { href: "/search", label: "Web Search", icon: Search },
   { href: "/image", label: "Image Gen", icon: ImageIcon },
-  { href: "/payment", label: "UPI Payment", icon: CreditCard },
+  { href: "/payment", label: "Premium ₹10", icon: Crown },
   { href: "/prompts", label: "Prompt Lab", icon: TerminalSquare },
   { href: "/voice", label: "AI Voice Call", icon: Mic },
+  { href: "/profile", label: "My Profile", icon: User },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 

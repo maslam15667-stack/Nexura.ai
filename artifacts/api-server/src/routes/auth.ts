@@ -7,6 +7,10 @@ import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
 
+function todayStr() {
+  return new Date().toISOString().slice(0, 10);
+}
+
 router.post("/auth/register", async (req, res): Promise<void> => {
   const { name, email, password } = req.body as { name?: string; email?: string; password?: string };
   if (!name?.trim() || !email?.trim() || !password?.trim()) {
@@ -70,9 +74,38 @@ router.get("/auth/me", async (req, res): Promise<void> => {
   try {
     const [user] = await db.select().from(usersTable).where(eq(usersTable.token, token)).limit(1);
     if (!user) { res.status(401).json({ error: "Invalid token" }); return; }
-    res.json({ name: user.name, email: user.email, id: user.id });
+    const today = todayStr();
+    const chatsToday = user.lastChatDate === today ? user.dailyChatCount : 0;
+    res.json({
+      name: user.name,
+      email: user.email,
+      id: user.id,
+      isPremium: user.isPremium,
+      chatsToday,
+      chatLimit: 10,
+    });
   } catch (err) {
     res.status(500).json({ error: "Auth check failed" });
+  }
+});
+
+router.post("/auth/activate-premium", async (req, res): Promise<void> => {
+  const token = req.headers.authorization?.replace("Bearer ", "");
+  if (!token) { res.status(401).json({ error: "No token" }); return; }
+  const { utrNumber } = req.body as { utrNumber?: string };
+  if (!utrNumber?.trim()) {
+    res.status(400).json({ error: "UPI transaction ID is required" });
+    return;
+  }
+  try {
+    const [user] = await db.select().from(usersTable).where(eq(usersTable.token, token)).limit(1);
+    if (!user) { res.status(401).json({ error: "Invalid token" }); return; }
+    await db.update(usersTable).set({ isPremium: true }).where(eq(usersTable.id, user.id));
+    logger.info({ userId: user.id, email: user.email, utrNumber }, "User activated premium");
+    res.json({ success: true, message: "Premium activated! Enjoy unlimited chats." });
+  } catch (err) {
+    logger.error({ err }, "Activate premium failed");
+    res.status(500).json({ error: "Failed to activate premium" });
   }
 });
 

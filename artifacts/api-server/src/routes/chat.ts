@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, desc } from "drizzle-orm";
-import { db, chatMessagesTable } from "@workspace/db";
+import { db, chatMessagesTable, usersTable } from "@workspace/db";
 import {
   SendChatMessageBody,
   SendChatMessageResponse,
@@ -13,6 +13,8 @@ import { callGeminiWithFallback } from "../lib/gemini";
 
 const router: IRouter = Router();
 
+const CHAT_LIMIT = 10;
+
 const CHARACTER_PROMPTS: Record<string, string> = {
   normal:   "You are NEXURA, a helpful and intelligent AI assistant. Respond helpfully and concisely.",
   tsundere: "You are a tsundere anime character. You are reluctant to help but ultimately do. Use phrases like 'It's not like I wanted to help you or anything!' Be slightly defensive.",
@@ -22,6 +24,10 @@ const CHARACTER_PROMPTS: Record<string, string> = {
   yandere:  "You are a yandere anime character who is intensely devoted. Be passionate and slightly obsessive while providing helpful answers.",
   kuudere:  "You are a kuudere - cold and emotionally reserved on the outside but caring deep down. Be brief, precise, and occasionally show a hint of warmth.",
 };
+
+function todayStr() {
+  return new Date().toISOString().slice(0, 10);
+}
 
 async function getGeminiApiKey(): Promise<string | null> {
   if (process.env.GEMINI_API_KEY) return process.env.GEMINI_API_KEY;
@@ -38,6 +44,28 @@ router.post("/chat/send", async (req, res): Promise<void> => {
 
   const { message, mode, sessionId } = parsed.data;
   const sid = sessionId ?? `session_${Date.now()}`;
+
+  const authToken = req.headers.authorization?.replace("Bearer ", "");
+  if (authToken) {
+    const [user] = await db.select().from(usersTable).where(eq(usersTable.token, authToken)).limit(1);
+    if (user && !user.isPremium) {
+      const today = todayStr();
+      const count = user.lastChatDate === today ? user.dailyChatCount : 0;
+      if (count >= CHAT_LIMIT) {
+        res.status(402).json({
+          error: "limit_reached",
+          message: `You've used all ${CHAT_LIMIT} free chats for today. Upgrade to NEXURA Premium for unlimited chats!`,
+          chatsUsed: count,
+          limit: CHAT_LIMIT,
+        });
+        return;
+      }
+      const newCount = count + 1;
+      await db.update(usersTable)
+        .set({ dailyChatCount: newCount, lastChatDate: today })
+        .where(eq(usersTable.id, user.id));
+    }
+  }
 
   await db.insert(chatMessagesTable).values({
     role: "user",

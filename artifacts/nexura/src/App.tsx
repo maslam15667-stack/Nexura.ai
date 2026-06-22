@@ -16,6 +16,7 @@ import Payment from "@/pages/Payment";
 import Prompts from "@/pages/Prompts";
 import Voice from "@/pages/Voice";
 import Settings from "@/pages/Settings";
+import Profile from "@/pages/Profile";
 import Admin from "@/pages/Admin";
 
 const queryClient = new QueryClient();
@@ -49,6 +50,7 @@ function Router() {
               <Route path="/prompts" component={Prompts} />
               <Route path="/voice" component={Voice} />
               <Route path="/settings" component={Settings} />
+              <Route path="/profile" component={Profile} />
               <Route component={NotFound} />
             </Switch>
           </Layout>
