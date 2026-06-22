@@ -3,3 +3,4 @@ export * from "./prompts";
 export * from "./payments";
 export * from "./settings";
 export * from "./users";
+export * from "./notifications";

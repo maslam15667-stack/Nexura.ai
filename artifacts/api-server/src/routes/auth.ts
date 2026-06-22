@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, usersTable } from "@workspace/db";
+import { db, usersTable, notificationsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { randomBytes } from "crypto";
@@ -15,6 +15,14 @@ function isPremiumActive(user: { isPremium: boolean; premiumExpiresAt: Date | nu
   if (!user.isPremium) return false;
   if (!user.premiumExpiresAt) return false;
   return user.premiumExpiresAt > new Date();
+}
+
+async function notify(type: string, title: string, body: string) {
+  try {
+    await db.insert(notificationsTable).values({ type, title, body });
+  } catch (e) {
+    logger.warn({ e }, "Failed to insert notification");
+  }
 }
 
 router.post("/auth/register", async (req, res): Promise<void> => {
@@ -41,6 +49,9 @@ router.post("/auth/register", async (req, res): Promise<void> => {
       password: hashed,
       token,
     }).returning();
+
+    await notify("register", "🎉 New User Registered", `${user.name} (${user.email}) just signed up to NEXURA.`);
+
     res.status(201).json({ token, name: user.name, email: user.email, id: user.id });
   } catch (err) {
     logger.error({ err }, "Register failed");
@@ -82,7 +93,6 @@ router.get("/auth/me", async (req, res): Promise<void> => {
     if (!user) { res.status(401).json({ error: "Invalid token" }); return; }
 
     const active = isPremiumActive(user);
-
     if (user.isPremium && !active) {
       await db.update(usersTable).set({ isPremium: false }).where(eq(usersTable.id, user.id));
     }
@@ -120,6 +130,12 @@ router.post("/auth/activate-premium", async (req, res): Promise<void> => {
     await db.update(usersTable)
       .set({ isPremium: true, premiumExpiresAt: expiresAt })
       .where(eq(usersTable.id, user.id));
+
+    await notify(
+      "premium",
+      "👑 Premium Purchase!",
+      `${user.name} (${user.email}) bought NEXURA Premium for ₹10. UTR: ${utrNumber}. Expires: ${expiresAt.toLocaleString()}.`
+    );
 
     logger.info({ userId: user.id, email: user.email, utrNumber, expiresAt }, "User activated premium");
     res.json({
