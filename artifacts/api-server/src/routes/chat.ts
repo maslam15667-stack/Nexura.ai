@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and, isNull } from "drizzle-orm";
 import { db, chatMessagesTable, usersTable } from "@workspace/db";
 import {
   SendChatMessageBody,
@@ -51,6 +51,8 @@ router.post("/chat/send", async (req, res): Promise<void> => {
   const { message, mode, sessionId } = parsed.data;
   const sid = sessionId ?? `session_${Date.now()}`;
 
+  let userId: number | null = null;
+
   const authToken = req.headers.authorization?.replace("Bearer ", "");
   if (authToken) {
     const [user] = await db.select().from(usersTable).where(eq(usersTable.token, authToken)).limit(1);
@@ -63,16 +65,14 @@ router.post("/chat/send", async (req, res): Promise<void> => {
       const today = todayStr();
       const todayCount = user.lastChatDate === today ? user.dailyChatCount : 0;
 
-      if (!premiumActive) {
-        if (todayCount >= CHAT_LIMIT) {
-          res.status(402).json({
-            error: "limit_reached",
-            message: `You've used all ${CHAT_LIMIT} free chats for today. Upgrade to NEXURA Premium for unlimited chats!`,
-            chatsUsed: todayCount,
-            limit: CHAT_LIMIT,
-          });
-          return;
-        }
+      if (!premiumActive && todayCount >= CHAT_LIMIT) {
+        res.status(402).json({
+          error: "limit_reached",
+          message: `You've used all ${CHAT_LIMIT} free chats for today. Upgrade to NEXURA Premium for unlimited chats!`,
+          chatsUsed: todayCount,
+          limit: CHAT_LIMIT,
+        });
+        return;
       }
 
       await db.update(usersTable)
@@ -82,10 +82,13 @@ router.post("/chat/send", async (req, res): Promise<void> => {
           totalChatCount: (user.totalChatCount ?? 0) + 1,
         })
         .where(eq(usersTable.id, user.id));
+
+      userId = user.id;
     }
   }
 
   await db.insert(chatMessagesTable).values({
+    userId,
     role: "user",
     content: message,
     sessionId: sid,
@@ -108,6 +111,7 @@ router.post("/chat/send", async (req, res): Promise<void> => {
   }
 
   await db.insert(chatMessagesTable).values({
+    userId,
     role: "assistant",
     content: reply,
     sessionId: sid,
@@ -124,20 +128,29 @@ router.get("/chat/history", async (req, res): Promise<void> => {
     return;
   }
 
+  const authToken = req.headers.authorization?.replace("Bearer ", "");
+  let userId: number | null = null;
+
+  if (authToken) {
+    const [user] = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.token, authToken)).limit(1);
+    if (user) userId = user.id;
+  }
+
   let messages;
-  if (params.data.sessionId) {
+
+  if (userId !== null) {
+    const conditions = params.data.sessionId
+      ? and(eq(chatMessagesTable.userId, userId), eq(chatMessagesTable.sessionId, params.data.sessionId))
+      : eq(chatMessagesTable.userId, userId);
+
     messages = await db
       .select()
       .from(chatMessagesTable)
-      .where(eq(chatMessagesTable.sessionId, params.data.sessionId))
+      .where(conditions)
       .orderBy(chatMessagesTable.createdAt)
-      .limit(100);
+      .limit(200);
   } else {
-    messages = await db
-      .select()
-      .from(chatMessagesTable)
-      .orderBy(desc(chatMessagesTable.createdAt))
-      .limit(100);
+    messages = [];
   }
 
   res.json(GetChatHistoryResponse.parse(messages.map(m => ({
