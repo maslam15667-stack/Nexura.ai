@@ -55,6 +55,10 @@ router.post("/chat/send", async (req, res): Promise<void> => {
   if (authToken) {
     const [user] = await db.select().from(usersTable).where(eq(usersTable.token, authToken)).limit(1);
     if (user) {
+      if (user.isBlocked) {
+        res.status(403).json({ error: "blocked", message: "Your account has been blocked. Contact support." });
+        return;
+      }
       const premiumActive = isPremiumActive(user);
       if (!premiumActive) {
         const today = todayStr();

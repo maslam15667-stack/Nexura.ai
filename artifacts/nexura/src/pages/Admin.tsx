@@ -1,152 +1,188 @@
-import { useState } from "react";
-import { useAdminListPayments, useAdminApprovePayment, useAdminRejectPayment, getAdminListPaymentsQueryKey } from "@workspace/api-client-react";
-import { useQueryClient } from "@tanstack/react-query";
-import { Button } from "@/components/ui/button";
-import { CheckCircle, XCircle, Clock, Shield, LogIn, Mail, Lock } from "lucide-react";
-import { motion } from "framer-motion";
+import { useState, useEffect, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  Shield, LogIn, Mail, Lock, XCircle, Users, Crown,
+  Trash2, Ban, CheckCircle, Clock, UserCheck, RefreshCw,
+  ChevronRight, AlertTriangle, Eye, EyeOff
+} from "lucide-react";
 import nexuraLogo from "@assets/ChatGPT_Image_Jun_11,_2026,_09_45_11_AM_1781152668994.png";
 
-const ALLOWED_EMAIL   = "maslam15667@gmail.com";
-const ADMIN_PASSWORD  = "nexura-admin-2024";
+const BASE          = import.meta.env.BASE_URL.replace(/\/$/, "");
+const ALLOWED_EMAIL = "maslam15667@gmail.com";
+const ADMIN_KEY     = "nexura-admin-2024";
 
-const STATUS_STYLES: Record<string, { color: string; icon: React.ReactNode }> = {
-  pending:  { color: "text-yellow-400 border-yellow-400/30 bg-yellow-400/5",  icon: <Clock className="w-4 h-4" /> },
-  approved: { color: "text-green-400 border-green-400/30 bg-green-400/5",     icon: <CheckCircle className="w-4 h-4" /> },
-  rejected: { color: "text-red-400 border-red-400/30 bg-red-400/5",           icon: <XCircle className="w-4 h-4" /> },
-  expired:  { color: "text-slate-400 border-slate-400/30 bg-slate-400/5",     icon: <Clock className="w-4 h-4" /> },
+type AdminUser = {
+  id: number;
+  name: string;
+  email: string;
+  isPremium: boolean;
+  premiumExpiresAt: string | null;
+  isBlocked: boolean;
+  isAdmin: boolean;
+  dailyChatCount: number;
+  lastChatDate: string;
+  createdAt: string;
 };
 
+function adminFetch(path: string, opts?: RequestInit) {
+  return fetch(`${BASE}/api${path}`, {
+    ...opts,
+    headers: { "x-admin-key": ADMIN_KEY, "Content-Type": "application/json", ...opts?.headers },
+  }).then(r => r.json());
+}
+
+function TabButton({ label, active, onClick, count }: { label: string; active: boolean; onClick: () => void; count?: number }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+        active ? "bg-primary/20 border border-primary/40 text-primary" : "text-white/40 hover:text-white/70"
+      }`}
+    >
+      {label}
+      {count !== undefined && (
+        <span className={`text-xs px-1.5 py-0.5 rounded-full ${active ? "bg-primary/30 text-primary" : "bg-white/10 text-white/40"}`}>
+          {count}
+        </span>
+      )}
+    </button>
+  );
+}
+
 export default function Admin() {
-  const [authed, setAuthed]       = useState(false);
-  const [email, setEmail]         = useState("");
-  const [pw, setPw]               = useState("");
-  const [emailError, setEmailError] = useState("");
-  const [pwError, setPwError]     = useState("");
-  const queryClient = useQueryClient();
+  const [authed, setAuthed]   = useState(false);
+  const [email, setEmail]     = useState("");
+  const [pw, setPw]           = useState("");
+  const [showPw, setShowPw]   = useState(false);
+  const [error, setError]     = useState("");
+  const [tab, setTab]         = useState<"users" | "payments">("users");
 
-  const { data: payments = [], isLoading } = useAdminListPayments({
-    query: { queryKey: getAdminListPaymentsQueryKey(), enabled: authed }
-  });
+  const [users, setUsers]           = useState<AdminUser[]>([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [actionId, setActionId]     = useState<number | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<AdminUser | null>(null);
 
-  const approve = useAdminApprovePayment();
-  const reject  = useAdminRejectPayment();
+  const fetchUsers = useCallback(async () => {
+    setUsersLoading(true);
+    const data = await adminFetch("/admin/users") as AdminUser[];
+    setUsers(Array.isArray(data) ? data : []);
+    setUsersLoading(false);
+  }, []);
+
+  useEffect(() => { if (authed) fetchUsers(); }, [authed, fetchUsers]);
 
   const handleLogin = () => {
-    setEmailError("");
-    setPwError("");
-
+    setError("");
     if (email.trim().toLowerCase() !== ALLOWED_EMAIL) {
-      setEmailError("Access denied. This admin panel is restricted.");
+      setError("Access denied. This email is not authorised.");
       return;
     }
-    if (pw !== ADMIN_PASSWORD) {
-      setPwError("Incorrect password.");
+    if (pw !== ADMIN_KEY) {
+      setError("Incorrect password.");
       return;
     }
     setAuthed(true);
   };
 
+  const handleBlock = async (u: AdminUser) => {
+    setActionId(u.id);
+    await adminFetch(`/admin/users/${u.id}/${u.isBlocked ? "unblock" : "block"}`, { method: "POST" });
+    await fetchUsers();
+    setActionId(null);
+  };
+
+  const handleDelete = async (u: AdminUser) => {
+    setActionId(u.id);
+    setConfirmDelete(null);
+    await adminFetch(`/admin/users/${u.id}`, { method: "DELETE" });
+    await fetchUsers();
+    setActionId(null);
+  };
+
+  /* ── Login screen ── */
   if (!authed) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-[#0A0A0F] relative overflow-hidden p-4">
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-primary/10 rounded-full blur-[120px]" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-accent/10 rounded-full blur-[80px]" />
+      <div className="flex flex-col items-center justify-center min-h-screen bg-[#050510] relative overflow-hidden p-4">
+        <div className="absolute top-0 left-0 right-0 bottom-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-primary/8 rounded-full blur-[120px]" />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] h-[300px] bg-accent/8 rounded-full blur-[80px]" />
+          <div className="absolute inset-0 opacity-[0.025]"
+            style={{ backgroundImage: "linear-gradient(rgba(0,212,255,1) 1px, transparent 1px), linear-gradient(90deg, rgba(0,212,255,1) 1px, transparent 1px)", backgroundSize: "60px 60px" }} />
+        </div>
 
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
-          className="relative z-10 w-full max-w-sm p-8 bg-white/5 backdrop-blur-xl rounded-2xl border border-primary/30 shadow-[0_0_40px_rgba(0,212,255,0.1)] space-y-6"
+          className="relative z-10 w-full max-w-sm"
         >
-          {/* Logo & title */}
-          <div className="flex flex-col items-center gap-3">
-            <motion.img
-              src={nexuraLogo}
-              alt="NEXURA"
-              className="w-16 h-16 object-contain"
-              animate={{ filter: ["drop-shadow(0 0 8px rgba(0,212,255,0.4))", "drop-shadow(0 0 18px rgba(0,212,255,0.8))", "drop-shadow(0 0 8px rgba(0,212,255,0.4))"] }}
-              transition={{ duration: 3, repeat: Infinity }}
-            />
-            <div className="text-center">
-              <h1 className="text-2xl font-display font-bold" style={{ textShadow: "0 0 10px rgba(0,212,255,0.5)" }}>
-                Admin Panel
-              </h1>
-              <p className="text-sm mt-1" style={{ color: "rgba(255,255,255,0.4)" }}>NEXURA Management — Private Access</p>
+          {/* Card */}
+          <div className="bg-black/60 border border-white/10 rounded-3xl p-7 backdrop-blur-xl shadow-2xl space-y-6">
+            {/* Logo */}
+            <div className="flex flex-col items-center gap-3">
+              <div className="w-14 h-14 rounded-2xl overflow-hidden border border-primary/30 shadow-[0_0_20px_rgba(0,212,255,0.3)]">
+                <img src={nexuraLogo} alt="NEXURA" className="w-full h-full object-cover" />
+              </div>
+              <div className="text-center">
+                <h1 className="text-xl font-display font-bold text-white">Admin Panel</h1>
+                <p className="text-xs text-white/30 mt-0.5 font-mono">NEXURA · PRIVATE ACCESS</p>
+              </div>
             </div>
-          </div>
 
-          {/* Restricted notice */}
-          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-accent/10 border border-accent/20">
-            <Shield className="w-4 h-4 shrink-0" style={{ color: "#8B5CF6" }} />
-            <p className="text-xs" style={{ color: "rgba(255,255,255,0.6)" }}>
-              Restricted to authorised admin only
-            </p>
-          </div>
+            {/* Restricted notice */}
+            <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-accent/10 border border-accent/20">
+              <Shield className="w-4 h-4 text-accent flex-shrink-0" />
+              <p className="text-xs text-white/60">Restricted to authorised admin only</p>
+            </div>
 
-          {/* Form */}
-          <div className="space-y-4">
-            {/* Email */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.4)" }}>
-                Admin Email
-              </label>
+            {/* Form */}
+            <div className="space-y-3">
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: "rgba(0,212,255,0.6)" }} />
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary/50" />
                 <input
                   type="email"
                   value={email}
-                  onChange={(e) => { setEmail(e.target.value); setEmailError(""); }}
-                  onKeyDown={(e) => e.key === "Enter" && handleLogin()}
-                  placeholder="your@email.com"
-                  autoComplete="email"
-                  data-testid="input-admin-email"
-                  className={`w-full pl-10 pr-4 py-3 rounded-xl bg-black/40 border text-white placeholder:text-white/20 focus:outline-none transition-all text-sm ${
-                    emailError ? "border-red-400/60 focus:border-red-400/80" : "border-white/10 focus:border-primary/60"
-                  }`}
+                  onChange={e => { setEmail(e.target.value); setError(""); }}
+                  onKeyDown={e => e.key === "Enter" && handleLogin()}
+                  placeholder="Admin email"
+                  className="w-full pl-10 pr-4 py-3 rounded-xl bg-white/5 border border-white/10 focus:border-primary/50 text-white text-sm placeholder:text-white/20 focus:outline-none transition-colors"
                 />
               </div>
-              {emailError && (
-                <p className="text-red-400 text-xs flex items-center gap-1">
-                  <XCircle className="w-3 h-3" /> {emailError}
-                </p>
-              )}
-            </div>
-
-            {/* Password */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.4)" }}>
-                Password
-              </label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: "rgba(0,212,255,0.6)" }} />
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary/50" />
                 <input
-                  type="password"
+                  type={showPw ? "text" : "password"}
                   value={pw}
-                  onChange={(e) => { setPw(e.target.value); setPwError(""); }}
-                  onKeyDown={(e) => e.key === "Enter" && handleLogin()}
-                  placeholder="••••••••"
-                  autoComplete="current-password"
-                  data-testid="input-admin-password"
-                  className={`w-full pl-10 pr-4 py-3 rounded-xl bg-black/40 border text-white placeholder:text-white/30 focus:outline-none transition-all text-sm ${
-                    pwError ? "border-red-400/60 focus:border-red-400/80" : "border-white/10 focus:border-primary/60"
-                  }`}
+                  onChange={e => { setPw(e.target.value); setError(""); }}
+                  onKeyDown={e => e.key === "Enter" && handleLogin()}
+                  placeholder="Password"
+                  className="w-full pl-10 pr-10 py-3 rounded-xl bg-white/5 border border-white/10 focus:border-primary/50 text-white text-sm placeholder:text-white/20 focus:outline-none transition-colors"
                 />
+                <button type="button" onClick={() => setShowPw(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60">
+                  {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
               </div>
-              {pwError && (
-                <p className="text-red-400 text-xs flex items-center gap-1">
-                  <XCircle className="w-3 h-3" /> {pwError}
-                </p>
-              )}
-            </div>
 
-            <Button
-              onClick={handleLogin}
-              data-testid="button-admin-login"
-              className="w-full font-bold py-5 text-black"
-              style={{ background: "linear-gradient(135deg, #00D4FF, #8B5CF6)" }}
-            >
-              <LogIn className="w-4 h-4 mr-2" />
-              Sign In to Admin
-            </Button>
+              <AnimatePresence>
+                {error && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="flex items-center gap-2 text-red-400 text-xs bg-red-400/10 border border-red-400/20 rounded-xl px-3 py-2.5"
+                  >
+                    <XCircle className="w-3.5 h-3.5 flex-shrink-0" /> {error}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <button
+                onClick={handleLogin}
+                disabled={!email || !pw}
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-gradient-to-r from-primary to-accent text-black font-bold text-sm hover:opacity-90 transition-opacity disabled:opacity-50 shadow-[0_0_20px_rgba(0,212,255,0.3)]"
+              >
+                <LogIn className="w-4 h-4" /> Sign In to Admin
+              </button>
+            </div>
           </div>
         </motion.div>
       </div>
@@ -154,127 +190,310 @@ export default function Admin() {
   }
 
   /* ── Dashboard ── */
-  return (
-    <div className="min-h-screen bg-[#0A0A0F] p-6 relative">
-      <div className="absolute top-0 left-0 right-0 h-40 bg-gradient-to-b from-primary/5 to-transparent pointer-events-none" />
+  const totalUsers    = users.length;
+  const premiumUsers  = users.filter(u => u.isPremium).length;
+  const blockedUsers  = users.filter(u => u.isBlocked).length;
 
-      <div className="relative z-10 max-w-4xl mx-auto space-y-8">
+  return (
+    <div className="min-h-screen bg-[#050510] text-white relative">
+      <div className="absolute top-0 left-0 right-0 h-48 bg-gradient-to-b from-primary/5 to-transparent pointer-events-none" />
+      <div className="absolute inset-0 opacity-[0.015] pointer-events-none"
+        style={{ backgroundImage: "linear-gradient(rgba(0,212,255,1) 1px, transparent 1px), linear-gradient(90deg, rgba(0,212,255,1) 1px, transparent 1px)", backgroundSize: "60px 60px" }} />
+
+      <div className="relative z-10 max-w-5xl mx-auto p-6 space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <img src={nexuraLogo} alt="NEXURA" className="w-12 h-12 object-contain" />
+        <div className="flex items-center justify-between flex-wrap gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl overflow-hidden border border-primary/30 shadow-[0_0_15px_rgba(0,212,255,0.3)]">
+              <img src={nexuraLogo} alt="NEXURA" className="w-full h-full object-cover" />
+            </div>
             <div>
-              <h1 className="text-2xl font-display font-bold" style={{ textShadow: "0 0 10px rgba(0,212,255,0.5)" }}>
+              <h1 className="text-xl font-display font-bold" style={{ textShadow: "0 0 10px rgba(0,212,255,0.5)" }}>
                 Admin Dashboard
               </h1>
-              <p className="text-sm" style={{ color: "rgba(255,255,255,0.4)" }}>
-                Signed in as <span style={{ color: "#00D4FF" }}>{ALLOWED_EMAIL}</span>
+              <p className="text-xs text-white/35 font-mono">
+                Signed in as <span className="text-primary/70">{ALLOWED_EMAIL}</span>
               </p>
             </div>
           </div>
-          <Button
-            variant="outline"
+          <button
             onClick={() => { setAuthed(false); setEmail(""); setPw(""); }}
-            className="border-red-400/30 text-red-400 hover:bg-red-400/10 text-xs"
+            className="text-xs px-3 py-2 rounded-xl border border-red-500/30 text-red-400 hover:bg-red-500/10 transition-colors"
           >
-            Logout
-          </Button>
+            Sign Out
+          </button>
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-3 gap-3">
           {[
-            { label: "Pending",  count: payments.filter(p => p.status === "pending").length,  color: "#F59E0B" },
-            { label: "Approved", count: payments.filter(p => p.status === "approved").length, color: "#22C55E" },
-            { label: "Total",    count: payments.length,                                       color: "#00D4FF" },
-          ].map(({ label, count, color }) => (
-            <div
-              key={label}
-              className="rounded-xl p-4 text-center bg-white/5 border"
-              style={{ borderColor: `${color}30` }}
-            >
-              <p className="text-3xl font-bold font-display" style={{ color }}>{count}</p>
-              <p className="text-xs mt-1" style={{ color: "rgba(255,255,255,0.4)" }}>{label}</p>
+            { label: "Total Users",    value: totalUsers,   color: "#00D4FF", icon: Users },
+            { label: "Premium Active", value: premiumUsers, color: "#F59E0B", icon: Crown },
+            { label: "Blocked",        value: blockedUsers, color: "#EF4444", icon: Ban },
+          ].map(({ label, value, color, icon: Icon }) => (
+            <div key={label} className="bg-white/5 border border-white/10 rounded-2xl p-4 text-center">
+              <Icon className="w-5 h-5 mx-auto mb-2 opacity-60" style={{ color }} />
+              <p className="text-2xl font-display font-bold" style={{ color }}>{value}</p>
+              <p className="text-xs text-white/35 mt-0.5">{label}</p>
             </div>
           ))}
         </div>
 
-        {/* Payments table */}
-        <div className="rounded-2xl overflow-hidden bg-white/5 border border-white/10">
-          <div className="px-6 py-4 border-b border-white/10 flex items-center gap-2">
-            <Shield className="w-4 h-4" style={{ color: "#00D4FF" }} />
-            <h2 className="font-display font-bold" style={{ color: "#00D4FF" }}>Payment Submissions</h2>
-          </div>
+        {/* Tabs */}
+        <div className="flex gap-2">
+          <TabButton label="Users" active={tab === "users"} onClick={() => setTab("users")} count={totalUsers} />
+          <TabButton label="Payments" active={tab === "payments"} onClick={() => setTab("payments")} />
+        </div>
 
-          {isLoading ? (
-            <div className="p-12 text-center" style={{ color: "rgba(255,255,255,0.4)" }}>Loading payments...</div>
-          ) : payments.length === 0 ? (
-            <div className="p-12 text-center" style={{ color: "rgba(255,255,255,0.4)" }}>No payments yet.</div>
-          ) : (
-            <div className="divide-y divide-white/5">
-              {[...payments].reverse().map((payment) => {
-                const style = STATUS_STYLES[payment.status] ?? STATUS_STYLES.pending;
-                return (
+        {/* Users tab */}
+        {tab === "users" && (
+          <div className="bg-black/40 border border-white/10 rounded-2xl overflow-hidden">
+            <div className="px-5 py-4 border-b border-white/10 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Users className="w-4 h-4 text-primary" />
+                <span className="font-semibold text-sm">All Users</span>
+                <span className="text-xs text-white/30">({totalUsers})</span>
+              </div>
+              <button
+                onClick={fetchUsers}
+                disabled={usersLoading}
+                className="flex items-center gap-1.5 text-xs text-white/40 hover:text-white transition-colors"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${usersLoading ? "animate-spin" : ""}`} />
+                Refresh
+              </button>
+            </div>
+
+            {usersLoading ? (
+              <div className="p-12 text-center text-white/30">
+                <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2" />
+                Loading users...
+              </div>
+            ) : users.length === 0 ? (
+              <div className="p-12 text-center text-white/30">No users registered yet.</div>
+            ) : (
+              <div className="divide-y divide-white/5">
+                {users.map((u, i) => (
                   <motion.div
-                    key={payment.id}
+                    key={u.id}
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
-                    className="px-6 py-4 flex items-center justify-between gap-4 flex-wrap"
-                    data-testid={`row-payment-${payment.id}`}
+                    transition={{ delay: i * 0.03 }}
+                    className={`px-5 py-4 flex items-center justify-between gap-4 flex-wrap ${u.isBlocked ? "opacity-50" : ""}`}
                   >
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-white font-mono font-bold">{payment.utrNumber}</span>
-                        <span className={`flex items-center gap-1 text-xs px-2 py-0.5 rounded-full border ${style.color}`}>
-                          {style.icon} {payment.status}
-                        </span>
+                    {/* User info */}
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-sm font-bold flex-shrink-0 border ${
+                        u.isAdmin
+                          ? "bg-primary/20 border-primary/40 text-primary"
+                          : u.isBlocked
+                            ? "bg-red-500/10 border-red-500/20 text-red-400"
+                            : u.isPremium
+                              ? "bg-yellow-500/20 border-yellow-500/30 text-yellow-400"
+                              : "bg-white/5 border-white/10 text-white/60"
+                      }`}>
+                        {u.name[0].toUpperCase()}
                       </div>
-                      <p className="text-xs" style={{ color: "rgba(255,255,255,0.35)" }}>
-                        Submitted: {new Date(payment.createdAt).toLocaleString()}
-                      </p>
-                      {payment.approvedAt && (
-                        <p className="text-xs text-green-400/70">
-                          Approved: {new Date(payment.approvedAt).toLocaleString()}
-                        </p>
-                      )}
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-semibold text-sm text-white truncate">{u.name}</span>
+                          {u.isAdmin && (
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-primary/20 border border-primary/30 text-primary">ADMIN</span>
+                          )}
+                          {u.isPremium && !u.isAdmin && (
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-yellow-500/20 border border-yellow-500/30 text-yellow-400">
+                              <Crown className="w-2.5 h-2.5 inline mr-0.5" />PREMIUM
+                            </span>
+                          )}
+                          {u.isBlocked && (
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-red-500/20 border border-red-500/30 text-red-400">BLOCKED</span>
+                          )}
+                        </div>
+                        <p className="text-xs text-white/35 truncate">{u.email}</p>
+                        <div className="flex items-center gap-3 mt-0.5">
+                          <span className="text-[10px] text-white/20 font-mono">ID #{u.id}</span>
+                          <span className="text-[10px] text-white/20">·</span>
+                          <span className="text-[10px] text-white/20">{u.dailyChatCount} chats today</span>
+                          <span className="text-[10px] text-white/20">·</span>
+                          <span className="text-[10px] text-white/20">Joined {new Date(u.createdAt).toLocaleDateString()}</span>
+                        </div>
+                        {u.isPremium && u.premiumExpiresAt && (
+                          <p className="text-[10px] text-yellow-400/50 mt-0.5">
+                            Premium expires: {new Date(u.premiumExpiresAt).toLocaleString()}
+                          </p>
+                        )}
+                      </div>
                     </div>
 
-                    {payment.status === "pending" && (
-                      <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          onClick={() => approve.mutate(
-                            { id: payment.id },
-                            { onSuccess: () => queryClient.invalidateQueries({ queryKey: getAdminListPaymentsQueryKey() }) }
-                          )}
-                          disabled={approve.isPending}
-                          data-testid={`button-approve-${payment.id}`}
-                          className="bg-green-500/20 hover:bg-green-500/30 border border-green-500/40 text-green-400 text-xs"
+                    {/* Actions — disabled for admin */}
+                    {!u.isAdmin && (
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <button
+                          onClick={() => handleBlock(u)}
+                          disabled={actionId === u.id}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
+                            u.isBlocked
+                              ? "bg-green-500/10 border-green-500/30 text-green-400 hover:bg-green-500/20"
+                              : "bg-orange-500/10 border-orange-500/30 text-orange-400 hover:bg-orange-500/20"
+                          } disabled:opacity-50`}
                         >
-                          <CheckCircle className="w-3 h-3 mr-1" /> Approve
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => reject.mutate(
-                            { id: payment.id },
-                            { onSuccess: () => queryClient.invalidateQueries({ queryKey: getAdminListPaymentsQueryKey() }) }
-                          )}
-                          disabled={reject.isPending}
-                          data-testid={`button-reject-${payment.id}`}
-                          className="border-red-400/40 text-red-400 hover:bg-red-400/10 text-xs"
+                          {u.isBlocked
+                            ? <><UserCheck className="w-3 h-3" /> Unblock</>
+                            : <><Ban className="w-3 h-3" /> Block</>
+                          }
+                        </button>
+                        <button
+                          onClick={() => setConfirmDelete(u)}
+                          disabled={actionId === u.id}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border bg-red-500/10 border-red-500/30 text-red-400 hover:bg-red-500/20 transition-all disabled:opacity-50"
                         >
-                          <XCircle className="w-3 h-3 mr-1" /> Reject
-                        </Button>
+                          <Trash2 className="w-3 h-3" /> Delete
+                        </button>
+                      </div>
+                    )}
+                    {u.isAdmin && (
+                      <div className="flex items-center gap-1.5 text-xs text-primary/40 font-mono">
+                        <Shield className="w-3 h-3" /> Protected
                       </div>
                     )}
                   </motion.div>
-                );
-              })}
-            </div>
-          )}
-        </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Payments tab */}
+        {tab === "payments" && (
+          <PaymentsPanel />
+        )}
       </div>
+
+      {/* Delete confirm modal */}
+      <AnimatePresence>
+        {confirmDelete && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-[#0a0a1a] border border-red-500/30 rounded-2xl p-6 max-w-sm w-full space-y-4 shadow-[0_0_40px_rgba(239,68,68,0.2)]"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-red-500/20 border border-red-500/30 flex items-center justify-center">
+                  <AlertTriangle className="w-5 h-5 text-red-400" />
+                </div>
+                <div>
+                  <p className="font-bold text-white">Delete User?</p>
+                  <p className="text-xs text-white/40">This cannot be undone</p>
+                </div>
+              </div>
+              <div className="bg-white/5 border border-white/10 rounded-xl p-3">
+                <p className="text-sm font-semibold text-white">{confirmDelete.name}</p>
+                <p className="text-xs text-white/40">{confirmDelete.email}</p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setConfirmDelete(null)}
+                  className="flex-1 py-2.5 rounded-xl border border-white/10 text-white/60 hover:text-white text-sm font-medium transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleDelete(confirmDelete)}
+                  className="flex-1 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-bold transition-colors"
+                >
+                  Delete User
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+function PaymentsPanel() {
+  const [payments, setPayments]   = useState<Array<{ id: number; utrNumber: string; status: string; approvedAt: string | null; expiresAt: string | null; createdAt: string }>>([]);
+  const [loading, setLoading]     = useState(true);
+  const [actionId, setActionId]   = useState<number | null>(null);
+
+  const fetchPayments = useCallback(async () => {
+    setLoading(true);
+    const data = await adminFetch("/admin/payments");
+    setPayments(Array.isArray(data) ? [...data].reverse() : []);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { fetchPayments(); }, [fetchPayments]);
+
+  const act = async (id: number, action: "approve" | "reject") => {
+    setActionId(id);
+    await adminFetch(`/admin/payments/${id}/${action}`, { method: "POST" });
+    await fetchPayments();
+    setActionId(null);
+  };
+
+  const STATUS_STYLE: Record<string, string> = {
+    pending:  "text-yellow-400 bg-yellow-400/10 border-yellow-400/30",
+    approved: "text-green-400 bg-green-400/10 border-green-400/30",
+    rejected: "text-red-400 bg-red-400/10 border-red-400/30",
+    expired:  "text-white/30 bg-white/5 border-white/10",
+  };
+
+  return (
+    <div className="bg-black/40 border border-white/10 rounded-2xl overflow-hidden">
+      <div className="px-5 py-4 border-b border-white/10 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Shield className="w-4 h-4 text-primary" />
+          <span className="font-semibold text-sm">Payment Submissions</span>
+        </div>
+        <button onClick={fetchPayments} disabled={loading} className="text-xs text-white/40 hover:text-white transition-colors flex items-center gap-1">
+          <RefreshCw className={`w-3 h-3 ${loading ? "animate-spin" : ""}`} /> Refresh
+        </button>
+      </div>
+      {loading ? (
+        <div className="p-12 text-center text-white/30"><RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2" />Loading...</div>
+      ) : payments.length === 0 ? (
+        <div className="p-12 text-center text-white/30">No payments yet.</div>
+      ) : (
+        <div className="divide-y divide-white/5">
+          {payments.map((p) => (
+            <motion.div key={p.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+              className="px-5 py-4 flex items-center justify-between gap-4 flex-wrap">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-white font-mono font-bold text-sm">{p.utrNumber}</span>
+                  <span className={`text-xs px-2 py-0.5 rounded-full border font-semibold ${STATUS_STYLE[p.status] ?? STATUS_STYLE.pending}`}>
+                    {p.status}
+                  </span>
+                </div>
+                <p className="text-xs text-white/30">Submitted: {new Date(p.createdAt).toLocaleString()}</p>
+                {p.approvedAt && <p className="text-xs text-green-400/60">Approved: {new Date(p.approvedAt).toLocaleString()}</p>}
+                {p.expiresAt  && <p className="text-xs text-yellow-400/50">Expires: {new Date(p.expiresAt).toLocaleString()}</p>}
+              </div>
+              {p.status === "pending" && (
+                <div className="flex gap-2">
+                  <button onClick={() => act(p.id, "approve")} disabled={actionId === p.id}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-green-500/10 border border-green-500/30 text-green-400 hover:bg-green-500/20 transition-all disabled:opacity-50">
+                    <CheckCircle className="w-3 h-3" /> Approve
+                  </button>
+                  <button onClick={() => act(p.id, "reject")} disabled={actionId === p.id}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 transition-all disabled:opacity-50">
+                    <XCircle className="w-3 h-3" /> Reject
+                  </button>
+                </div>
+              )}
+            </motion.div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

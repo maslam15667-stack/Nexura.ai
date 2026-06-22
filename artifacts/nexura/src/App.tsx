@@ -35,7 +35,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/login" component={Login} />
-      <Route path="/admin-nexura-777" component={Admin} />
+      <Route path="/admin" component={Admin} />
       <Route>
         <AuthGuard>
           <Layout>
