@@ -29,6 +29,12 @@ function todayStr() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function isPremiumActive(user: { isPremium: boolean; premiumExpiresAt: Date | null }): boolean {
+  if (!user.isPremium) return false;
+  if (!user.premiumExpiresAt) return false;
+  return user.premiumExpiresAt > new Date();
+}
+
 async function getGeminiApiKey(): Promise<string | null> {
   if (process.env.GEMINI_API_KEY) return process.env.GEMINI_API_KEY;
   const [settings] = await db.select().from(settingsTable).limit(1);
@@ -48,22 +54,25 @@ router.post("/chat/send", async (req, res): Promise<void> => {
   const authToken = req.headers.authorization?.replace("Bearer ", "");
   if (authToken) {
     const [user] = await db.select().from(usersTable).where(eq(usersTable.token, authToken)).limit(1);
-    if (user && !user.isPremium) {
-      const today = todayStr();
-      const count = user.lastChatDate === today ? user.dailyChatCount : 0;
-      if (count >= CHAT_LIMIT) {
-        res.status(402).json({
-          error: "limit_reached",
-          message: `You've used all ${CHAT_LIMIT} free chats for today. Upgrade to NEXURA Premium for unlimited chats!`,
-          chatsUsed: count,
-          limit: CHAT_LIMIT,
-        });
-        return;
+    if (user) {
+      const premiumActive = isPremiumActive(user);
+      if (!premiumActive) {
+        const today = todayStr();
+        const count = user.lastChatDate === today ? user.dailyChatCount : 0;
+        if (count >= CHAT_LIMIT) {
+          res.status(402).json({
+            error: "limit_reached",
+            message: `You've used all ${CHAT_LIMIT} free chats for today. Upgrade to NEXURA Premium for unlimited chats!`,
+            chatsUsed: count,
+            limit: CHAT_LIMIT,
+          });
+          return;
+        }
+        const newCount = count + 1;
+        await db.update(usersTable)
+          .set({ dailyChatCount: newCount, lastChatDate: today })
+          .where(eq(usersTable.id, user.id));
       }
-      const newCount = count + 1;
-      await db.update(usersTable)
-        .set({ dailyChatCount: newCount, lastChatDate: today })
-        .where(eq(usersTable.id, user.id));
     }
   }
 

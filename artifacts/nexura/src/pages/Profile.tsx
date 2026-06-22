@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useLocation } from "wouter";
 import { motion } from "framer-motion";
-import { Crown, MessageSquare, Mail, User, Star, ArrowRight, Shield, Calendar, LogOut } from "lucide-react";
+import { Crown, MessageSquare, Mail, User, Star, ArrowRight, Shield, LogOut, Timer, AlertCircle } from "lucide-react";
 import { LogoBackground } from "@/components/LogoBackground";
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -11,23 +11,73 @@ type UserInfo = {
   email: string;
   id: number;
   isPremium: boolean;
+  premiumExpiresAt: string | null;
   chatsToday: number;
   chatLimit: number;
 };
+
+function useCountdown(expiresAt: string | null) {
+  const calc = useCallback(() => {
+    if (!expiresAt) return null;
+    const diff = new Date(expiresAt).getTime() - Date.now();
+    if (diff <= 0) return null;
+    const h = Math.floor(diff / 3600000);
+    const m = Math.floor((diff % 3600000) / 60000);
+    const s = Math.floor((diff % 60000) / 1000);
+    return { h, m, s, totalMs: diff };
+  }, [expiresAt]);
+
+  const [timeLeft, setTimeLeft] = useState(calc);
+
+  useEffect(() => {
+    const id = setInterval(() => setTimeLeft(calc()), 1000);
+    return () => clearInterval(id);
+  }, [calc]);
+
+  return timeLeft;
+}
+
+function CountdownBadge({ expiresAt }: { expiresAt: string }) {
+  const t = useCountdown(expiresAt);
+  if (!t) return (
+    <div className="flex items-center gap-1.5 text-xs text-red-400/80 bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-1.5">
+      <AlertCircle className="w-3 h-3" /> Premium expired
+    </div>
+  );
+
+  const urgency = t.totalMs < 3600000; // under 1 hour
+  return (
+    <div className={`flex items-center gap-2 text-xs font-mono rounded-xl px-3 py-2 border ${
+      urgency
+        ? "text-orange-400 bg-orange-500/10 border-orange-500/30"
+        : "text-green-400 bg-green-500/10 border-green-500/30"
+    }`}>
+      <Timer className="w-3.5 h-3.5" />
+      <span>
+        Expires in{" "}
+        <strong>
+          {String(t.h).padStart(2, "0")}:{String(t.m).padStart(2, "0")}:{String(t.s).padStart(2, "0")}
+        </strong>
+      </span>
+    </div>
+  );
+}
 
 export default function Profile() {
   const [, navigate] = useLocation();
   const [user, setUser] = useState<UserInfo | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const fetchMe = useCallback(() => {
     const token = localStorage.getItem("nexura_token");
     if (!token) { navigate("/login"); return; }
     fetch(`${BASE}/api/auth/me`, { headers: { Authorization: `Bearer ${token}` } })
       .then(r => r.json())
-      .then(data => { setUser(data); setLoading(false); })
+      .then((data: UserInfo) => { setUser(data); setLoading(false); })
       .catch(() => setLoading(false));
   }, [navigate]);
+
+  useEffect(() => { fetchMe(); }, [fetchMe]);
 
   const handleLogout = () => {
     if (confirm("Log out of NEXURA?")) {
@@ -43,11 +93,11 @@ export default function Profile() {
       </div>
     );
   }
-
   if (!user) return null;
 
   const chatsRemaining = user.isPremium ? "∞" : Math.max(0, user.chatLimit - user.chatsToday);
-  const usagePercent = user.isPremium ? 0 : Math.min(100, (user.chatsToday / user.chatLimit) * 100);
+  const usagePercent   = user.isPremium ? 0 : Math.min(100, (user.chatsToday / user.chatLimit) * 100);
+  const expiryDate     = user.premiumExpiresAt ? new Date(user.premiumExpiresAt) : null;
 
   return (
     <div className="flex flex-col h-full overflow-y-auto relative">
@@ -69,7 +119,6 @@ export default function Profile() {
             </div>
           )}
 
-          {/* Avatar circle */}
           <div className={`w-20 h-20 rounded-full mx-auto mb-4 flex items-center justify-center text-3xl font-bold border-2 ${
             user.isPremium
               ? "bg-gradient-to-br from-yellow-500/20 to-amber-400/20 border-yellow-500/40 shadow-[0_0_20px_rgba(245,158,11,0.3)]"
@@ -90,7 +139,41 @@ export default function Profile() {
           }`}>
             {user.isPremium ? <><Crown className="w-3 h-3" /> NEXURA Premium</> : <><User className="w-3 h-3" /> Free Account</>}
           </div>
+
+          {/* Countdown timer */}
+          {user.isPremium && user.premiumExpiresAt && (
+            <div className="mt-3 flex justify-center">
+              <CountdownBadge expiresAt={user.premiumExpiresAt} />
+            </div>
+          )}
         </motion.div>
+
+        {/* Premium expiry info */}
+        {user.isPremium && expiryDate && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.05 }}
+            className="bg-yellow-500/5 border border-yellow-500/20 rounded-2xl p-4 space-y-2"
+          >
+            <div className="flex items-center gap-2">
+              <Timer className="w-4 h-4 text-yellow-400" />
+              <span className="text-sm font-semibold text-yellow-400">Premium Active — 24 Hour Pass</span>
+            </div>
+            <p className="text-xs text-white/50 pl-6">
+              Activated: {new Date(expiryDate.getTime() - 86400000).toLocaleString()}
+            </p>
+            <p className="text-xs text-white/50 pl-6">
+              Expires: <span className="text-yellow-400/80">{expiryDate.toLocaleString()}</span>
+            </p>
+            <button
+              onClick={() => navigate("/payment")}
+              className="ml-6 text-xs text-yellow-400/60 hover:text-yellow-400 underline transition-colors"
+            >
+              Renew after expiry →
+            </button>
+          </motion.div>
+        )}
 
         {/* Usage stats */}
         <motion.div
@@ -99,7 +182,7 @@ export default function Profile() {
           transition={{ delay: 0.08 }}
           className="bg-white/5 border border-white/10 rounded-2xl p-5 space-y-4"
         >
-          <div className="flex items-center gap-2 mb-1">
+          <div className="flex items-center gap-2">
             <MessageSquare className="w-4 h-4 text-primary" />
             <span className="font-semibold text-sm text-white">Today's Chat Usage</span>
           </div>
@@ -131,17 +214,17 @@ export default function Profile() {
           {user.isPremium && (
             <div className="flex items-center gap-2 text-yellow-400/70 text-xs">
               <Star className="w-3 h-3" />
-              <span>Unlimited chats — Premium active</span>
+              <span>Unlimited chats — Premium active for 24 hours</span>
             </div>
           )}
         </motion.div>
 
-        {/* Upgrade card (only for free) */}
+        {/* Upgrade card (free users only) */}
         {!user.isPremium && (
           <motion.button
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.15 }}
+            transition={{ delay: 0.12 }}
             onClick={() => navigate("/payment")}
             className="w-full bg-gradient-to-r from-yellow-500/10 to-amber-400/10 border border-yellow-500/30 rounded-2xl p-5 text-left hover:from-yellow-500/20 hover:to-amber-400/20 transition-all group"
           >
@@ -151,7 +234,7 @@ export default function Profile() {
                   <Crown className="w-5 h-5 text-yellow-400" />
                 </div>
                 <div>
-                  <p className="font-bold text-white text-sm">Upgrade to Premium</p>
+                  <p className="font-bold text-white text-sm">Get Premium — 24 Hours</p>
                   <p className="text-xs text-yellow-400/70 mt-0.5">Unlimited chats · Just ₹10</p>
                 </div>
               </div>
@@ -160,11 +243,33 @@ export default function Profile() {
           </motion.button>
         )}
 
+        {/* Renew card (premium users — show near expiry or always) */}
+        {user.isPremium && (
+          <motion.button
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.12 }}
+            onClick={() => navigate("/payment")}
+            className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-left hover:bg-white/8 transition-all group"
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Crown className="w-5 h-5 text-yellow-400" />
+                <div>
+                  <p className="text-sm font-semibold text-white">Renew Premium</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Extend for another 24 hours · ₹10</p>
+                </div>
+              </div>
+              <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:translate-x-1 transition-transform" />
+            </div>
+          </motion.button>
+        )}
+
         {/* Account info */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
+          transition={{ delay: 0.18 }}
           className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden"
         >
           <div className="px-5 py-3 border-b border-white/5 flex items-center gap-2">
@@ -179,7 +284,7 @@ export default function Profile() {
             <div className="flex items-center justify-between px-5 py-3">
               <span className="text-sm text-muted-foreground">Plan</span>
               <span className={`text-sm font-semibold ${user.isPremium ? "text-yellow-400" : "text-white/60"}`}>
-                {user.isPremium ? "Premium" : "Free"}
+                {user.isPremium ? "Premium (24h)" : "Free"}
               </span>
             </div>
             <div className="flex items-center justify-between px-5 py-3">
@@ -193,7 +298,7 @@ export default function Profile() {
         <motion.button
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.25 }}
+          transition={{ delay: 0.22 }}
           onClick={handleLogout}
           className="w-full flex items-center justify-between px-5 py-4 rounded-2xl bg-red-500/10 border border-red-500/20 hover:bg-red-500/20 transition-all group"
         >

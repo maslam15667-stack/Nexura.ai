@@ -11,6 +11,12 @@ function todayStr() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function isPremiumActive(user: { isPremium: boolean; premiumExpiresAt: Date | null }): boolean {
+  if (!user.isPremium) return false;
+  if (!user.premiumExpiresAt) return false;
+  return user.premiumExpiresAt > new Date();
+}
+
 router.post("/auth/register", async (req, res): Promise<void> => {
   const { name, email, password } = req.body as { name?: string; email?: string; password?: string };
   if (!name?.trim() || !email?.trim() || !password?.trim()) {
@@ -74,13 +80,22 @@ router.get("/auth/me", async (req, res): Promise<void> => {
   try {
     const [user] = await db.select().from(usersTable).where(eq(usersTable.token, token)).limit(1);
     if (!user) { res.status(401).json({ error: "Invalid token" }); return; }
+
+    const active = isPremiumActive(user);
+
+    if (user.isPremium && !active) {
+      await db.update(usersTable).set({ isPremium: false }).where(eq(usersTable.id, user.id));
+    }
+
     const today = todayStr();
     const chatsToday = user.lastChatDate === today ? user.dailyChatCount : 0;
+
     res.json({
       name: user.name,
       email: user.email,
       id: user.id,
-      isPremium: user.isPremium,
+      isPremium: active,
+      premiumExpiresAt: user.premiumExpiresAt?.toISOString() ?? null,
       chatsToday,
       chatLimit: 10,
     });
@@ -100,9 +115,18 @@ router.post("/auth/activate-premium", async (req, res): Promise<void> => {
   try {
     const [user] = await db.select().from(usersTable).where(eq(usersTable.token, token)).limit(1);
     if (!user) { res.status(401).json({ error: "Invalid token" }); return; }
-    await db.update(usersTable).set({ isPremium: true }).where(eq(usersTable.id, user.id));
-    logger.info({ userId: user.id, email: user.email, utrNumber }, "User activated premium");
-    res.json({ success: true, message: "Premium activated! Enjoy unlimited chats." });
+
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    await db.update(usersTable)
+      .set({ isPremium: true, premiumExpiresAt: expiresAt })
+      .where(eq(usersTable.id, user.id));
+
+    logger.info({ userId: user.id, email: user.email, utrNumber, expiresAt }, "User activated premium");
+    res.json({
+      success: true,
+      message: "Premium activated! Enjoy unlimited chats for 24 hours.",
+      premiumExpiresAt: expiresAt.toISOString(),
+    });
   } catch (err) {
     logger.error({ err }, "Activate premium failed");
     res.status(500).json({ error: "Failed to activate premium" });

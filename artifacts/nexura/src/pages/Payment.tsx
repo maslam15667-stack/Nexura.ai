@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Crown, Check, Sparkles, Zap, MessageSquare, Image, Loader2, CheckCircle, Star } from "lucide-react";
+import { Crown, Check, Sparkles, Zap, MessageSquare, Image, Loader2, CheckCircle, Star, Timer } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { LogoBackground } from "@/components/LogoBackground";
 import { useToast } from "@/hooks/use-toast";
@@ -8,24 +8,21 @@ import { useToast } from "@/hooks/use-toast";
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 const UPI_ID = "maslam15667@okaxis";
 const UPI_NAME = "Mohammed Aslam";
-const UPI_URI = `upi://pay?pa=${UPI_ID}&pn=${encodeURIComponent(UPI_NAME)}&am=10&cu=INR&tn=${encodeURIComponent("NEXURA Premium")}`;
+const UPI_URI = `upi://pay?pa=${UPI_ID}&pn=${encodeURIComponent(UPI_NAME)}&am=10&cu=INR&tn=${encodeURIComponent("NEXURA Premium 24h")}`;
 
 const FEATURES = [
-  { icon: MessageSquare, label: "Unlimited AI chats daily", free: "10/day", premium: "Unlimited" },
-  { icon: Image,         label: "Image generation",         free: "Limited", premium: "Unlimited" },
-  { icon: Zap,           label: "Priority AI responses",    free: false, premium: true },
-  { icon: Star,          label: "Premium badge",            free: false, premium: true },
+  { icon: MessageSquare, label: "Unlimited AI chats",      free: "10/day",   premium: "Unlimited" },
+  { icon: Image,         label: "Image generation",        free: "Limited",  premium: "Unlimited" },
+  { icon: Zap,           label: "Priority AI responses",   free: false,      premium: true },
+  { icon: Star,          label: "Premium badge",           free: false,      premium: true },
+  { icon: Timer,         label: "Valid for",               free: "—",        premium: "24 hours" },
 ];
 
 export default function Payment() {
   const { toast } = useToast();
   const [utr, setUtr]         = useState("");
   const [loading, setLoading] = useState(false);
-  const [activated, setActivated] = useState(() => {
-    const u = localStorage.getItem("nexura_user");
-    if (!u) return false;
-    try { return JSON.parse(u).isPremium === true; } catch { return false; }
-  });
+  const [result, setResult]   = useState<{ expiresAt: string } | null>(null);
 
   const handleActivate = async () => {
     if (!utr.trim()) return;
@@ -37,15 +34,15 @@ export default function Payment() {
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ utrNumber: utr }),
       });
-      const data = await res.json() as { success?: boolean; error?: string };
+      const data = await res.json() as { success?: boolean; error?: string; premiumExpiresAt?: string };
       if (res.ok && data.success) {
-        setActivated(true);
+        setResult({ expiresAt: data.premiumExpiresAt! });
         const stored = localStorage.getItem("nexura_user");
         if (stored) {
           const parsed = JSON.parse(stored) as Record<string, unknown>;
           localStorage.setItem("nexura_user", JSON.stringify({ ...parsed, isPremium: true }));
         }
-        toast({ title: "🎉 Premium Activated!", description: "Enjoy unlimited chats on NEXURA!" });
+        toast({ title: "🎉 Premium Activated!", description: "Enjoy unlimited chats for 24 hours!" });
       } else {
         toast({ title: "Error", description: data.error ?? "Failed to activate", variant: "destructive" });
       }
@@ -70,11 +67,11 @@ export default function Payment() {
           <h1 className="text-2xl font-display font-bold bg-gradient-to-r from-yellow-400 to-amber-300 bg-clip-text text-transparent">
             NEXURA Premium
           </h1>
-          <p className="text-muted-foreground text-sm">Unlock unlimited AI power for just ₹10</p>
+          <p className="text-muted-foreground text-sm">Unlimited AI for 24 hours — just ₹10</p>
         </div>
 
         <AnimatePresence mode="wait">
-          {activated ? (
+          {result ? (
             <motion.div
               key="activated"
               initial={{ opacity: 0, scale: 0.9 }}
@@ -84,23 +81,30 @@ export default function Payment() {
               <CheckCircle className="w-16 h-16 text-green-400 mx-auto" />
               <div>
                 <h3 className="text-xl font-bold text-green-400">You're Premium! 🎉</h3>
-                <p className="text-sm text-muted-foreground mt-1">Enjoy unlimited AI chats and all premium features.</p>
+                <p className="text-sm text-muted-foreground mt-1">Enjoy unlimited chats for the next 24 hours.</p>
+              </div>
+              <div className="bg-black/30 border border-white/10 rounded-xl p-3 space-y-1 text-xs text-left">
+                <p className="text-white/40 font-mono uppercase tracking-wider">Expires at</p>
+                <p className="text-yellow-400 font-semibold">{new Date(result.expiresAt).toLocaleString()}</p>
               </div>
               <div className="flex items-center justify-center gap-2 text-yellow-400 bg-yellow-500/10 rounded-xl px-4 py-2 border border-yellow-500/20">
-                <Crown className="w-4 h-4" />
-                <span className="text-sm font-semibold">NEXURA Premium Active</span>
+                <Timer className="w-4 h-4" />
+                <span className="text-sm font-semibold">24-Hour Premium Active</span>
               </div>
             </motion.div>
           ) : (
             <motion.div key="upgrade" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
 
-              {/* Price */}
+              {/* Price + duration */}
               <div className="bg-gradient-to-r from-yellow-500/10 to-amber-400/10 border border-yellow-500/30 rounded-2xl p-5 text-center">
                 <div className="flex items-baseline justify-center gap-1">
                   <span className="text-5xl font-display font-bold text-white">₹10</span>
-                  <span className="text-muted-foreground">/lifetime</span>
+                  <span className="text-muted-foreground">/ 24 hours</span>
                 </div>
-                <p className="text-xs text-yellow-400/70 mt-1">One time · No hidden charges</p>
+                <div className="flex items-center justify-center gap-1.5 mt-2 text-yellow-400/70 text-xs">
+                  <Timer className="w-3 h-3" />
+                  <span>Valid for exactly 24 hours from activation · No auto-renewal</span>
+                </div>
               </div>
 
               {/* Features comparison */}
@@ -126,7 +130,7 @@ export default function Payment() {
                       <div className="py-3 px-2 flex items-center justify-center bg-yellow-500/5">
                         {f.premium === true
                           ? <Check className="w-3.5 h-3.5 text-green-400" />
-                          : <span className="text-yellow-400 font-semibold">{f.premium}</span>}
+                          : <span className="text-yellow-400 font-semibold">{f.premium as string}</span>}
                       </div>
                     </div>
                   );
@@ -163,7 +167,7 @@ export default function Payment() {
               {/* UTR input */}
               <div className="bg-white/5 border border-white/10 rounded-2xl p-5 space-y-3">
                 <p className="text-xs text-muted-foreground font-mono uppercase tracking-wider text-center">
-                  Step 2 — Enter Transaction ID
+                  Step 2 — Enter Transaction ID to Activate
                 </p>
                 <Input
                   value={utr}
@@ -179,11 +183,11 @@ export default function Payment() {
                 >
                   {loading
                     ? <><Loader2 className="w-4 h-4 animate-spin" /> Activating...</>
-                    : <><Crown className="w-4 h-4 text-yellow-400" /> Activate Premium</>
+                    : <><Crown className="w-4 h-4 text-yellow-400" /> Activate 24-Hour Premium</>
                   }
                 </button>
                 <p className="text-xs text-center text-white/25">
-                  Your account will be upgraded instantly after submission
+                  Premium starts instantly · valid for 24 hours · renew anytime
                 </p>
               </div>
             </motion.div>
