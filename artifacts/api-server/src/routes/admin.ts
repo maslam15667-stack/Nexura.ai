@@ -80,6 +80,7 @@ router.get("/admin/users", requireAdmin, async (_req, res): Promise<void> => {
       id: usersTable.id, name: usersTable.name, email: usersTable.email,
       isPremium: usersTable.isPremium, premiumExpiresAt: usersTable.premiumExpiresAt,
       isBlocked: usersTable.isBlocked, dailyChatCount: usersTable.dailyChatCount,
+      totalChatCount: usersTable.totalChatCount,
       lastChatDate: usersTable.lastChatDate, createdAt: usersTable.createdAt,
     })
     .from(usersTable)

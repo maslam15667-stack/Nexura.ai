@@ -60,23 +60,28 @@ router.post("/chat/send", async (req, res): Promise<void> => {
         return;
       }
       const premiumActive = isPremiumActive(user);
+      const today = todayStr();
+      const todayCount = user.lastChatDate === today ? user.dailyChatCount : 0;
+
       if (!premiumActive) {
-        const today = todayStr();
-        const count = user.lastChatDate === today ? user.dailyChatCount : 0;
-        if (count >= CHAT_LIMIT) {
+        if (todayCount >= CHAT_LIMIT) {
           res.status(402).json({
             error: "limit_reached",
             message: `You've used all ${CHAT_LIMIT} free chats for today. Upgrade to NEXURA Premium for unlimited chats!`,
-            chatsUsed: count,
+            chatsUsed: todayCount,
             limit: CHAT_LIMIT,
           });
           return;
         }
-        const newCount = count + 1;
-        await db.update(usersTable)
-          .set({ dailyChatCount: newCount, lastChatDate: today })
-          .where(eq(usersTable.id, user.id));
       }
+
+      await db.update(usersTable)
+        .set({
+          dailyChatCount: todayCount + 1,
+          lastChatDate: today,
+          totalChatCount: (user.totalChatCount ?? 0) + 1,
+        })
+        .where(eq(usersTable.id, user.id));
     }
   }
 

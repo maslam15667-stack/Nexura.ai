@@ -17,7 +17,8 @@ type AdminUser = {
   id: number; name: string; email: string;
   isPremium: boolean; premiumExpiresAt: string | null;
   isBlocked: boolean; isAdmin: boolean;
-  dailyChatCount: number; lastChatDate: string; createdAt: string;
+  dailyChatCount: number; totalChatCount: number;
+  lastChatDate: string; createdAt: string;
 };
 
 type Notification = {
@@ -436,11 +437,12 @@ export default function Admin() {
         )}
 
         {/* Stats */}
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[
             { label: "Total Users",    value: totalUsers,   color: "#00D4FF", Icon: Users },
             { label: "Premium Active", value: premiumUsers, color: "#F59E0B", Icon: Crown },
             { label: "Blocked",        value: blockedUsers, color: "#EF4444", Icon: Ban },
+            { label: "Chats Today",    value: users.reduce((s, u) => s + (u.lastChatDate === new Date().toISOString().slice(0, 10) ? u.dailyChatCount : 0), 0), color: "#8B5CF6", Icon: Sparkles },
           ].map(({ label, value, color, Icon }) => (
             <div key={label} className="bg-white/5 border border-white/10 rounded-2xl p-4 text-center">
               <Icon className="w-5 h-5 mx-auto mb-2 opacity-60" style={{ color }} />
@@ -503,12 +505,24 @@ export default function Admin() {
                           {u.isBlocked  && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-red-500/20 border border-red-500/30 text-red-400">BLOCKED</span>}
                         </div>
                         <p className="text-xs text-white/35 truncate">{u.email}</p>
-                        <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                        <div className="flex items-center gap-2 mt-1 flex-wrap">
                           <span className="text-[10px] text-white/20 font-mono">#{u.id}</span>
                           <span className="text-[10px] text-white/15">·</span>
-                          <span className="text-[10px] text-white/20">{u.dailyChatCount} chats today</span>
-                          <span className="text-[10px] text-white/15">·</span>
                           <span className="text-[10px] text-white/20">Joined {new Date(u.createdAt).toLocaleDateString()}</span>
+                        </div>
+                        <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+                          <div className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-accent/10 border border-accent/20">
+                            <Sparkles className="w-3 h-3 text-accent" />
+                            <span className="text-[11px] font-bold text-accent">
+                              {u.lastChatDate === new Date().toISOString().slice(0, 10) ? u.dailyChatCount : 0}
+                            </span>
+                            <span className="text-[10px] text-white/30">today</span>
+                          </div>
+                          <div className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-white/5 border border-white/10">
+                            <Clock className="w-3 h-3 text-white/30" />
+                            <span className="text-[11px] font-semibold text-white/50">{u.totalChatCount ?? 0}</span>
+                            <span className="text-[10px] text-white/25">total</span>
+                          </div>
                         </div>
                         {u.isPremium && u.premiumExpiresAt && (
                           <p className="text-[10px] text-yellow-400/50 mt-0.5">Premium expires: {new Date(u.premiumExpiresAt).toLocaleString()}</p>
