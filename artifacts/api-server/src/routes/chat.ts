@@ -29,7 +29,10 @@ function todayStr() {
   return new Date().toISOString().slice(0, 10);
 }
 
-function isPremiumActive(user: { isPremium: boolean; premiumExpiresAt: Date | null }): boolean {
+const ADMIN_EMAIL = "maslam15667@gmail.com";
+
+function isPremiumActive(user: { email: string; isPremium: boolean; premiumExpiresAt: Date | null }): boolean {
+  if (user.email.toLowerCase() === ADMIN_EMAIL) return true;
   if (!user.isPremium) return false;
   if (!user.premiumExpiresAt) return false;
   return user.premiumExpiresAt > new Date();
