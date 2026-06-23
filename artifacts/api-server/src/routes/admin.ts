@@ -6,7 +6,7 @@ import { logger } from "../lib/logger";
 const router: IRouter = Router();
 
 const ADMIN_EMAIL = "maslam15667@gmail.com";
-const ADMIN_KEY   = "nexura-admin-2024";
+const ADMIN_KEY   = "aslam72017";
 
 function requireAdmin(req: import("express").Request, res: import("express").Response, next: import("express").NextFunction): void {
   const key = req.headers["x-admin-key"] as string | undefined;

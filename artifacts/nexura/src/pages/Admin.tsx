@@ -3,14 +3,14 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Shield, LogIn, Mail, Lock, XCircle, Users, Crown,
   Trash2, Ban, CheckCircle, RefreshCw, UserCheck,
-  AlertTriangle, Eye, EyeOff, Bell, BellRing, UserPlus,
-  Sparkles, Clock, MarkAsUnread
+  AlertTriangle, Bell, BellRing, UserPlus,
+  Sparkles, Clock
 } from "lucide-react";
 import nexuraLogo from "@assets/ChatGPT_Image_Jun_11,_2026,_09_45_11_AM_1781152668994.png";
 
 const BASE          = import.meta.env.BASE_URL.replace(/\/$/, "");
 const ALLOWED_EMAIL = "maslam15667@gmail.com";
-const ADMIN_KEY     = "nexura-admin-2024";
+const ADMIN_KEY     = "aslam72017";
 const POLL_MS       = 15000;
 
 type AdminUser = {
@@ -243,9 +243,8 @@ function PaymentsPanel() {
 /* ══════════════════════════════════════ Main component ══════════════════════════════════════ */
 export default function Admin() {
   const [authed, setAuthed]   = useState(false);
-  const [email, setEmail]     = useState("");
+  const [email]               = useState(ALLOWED_EMAIL);
   const [pw, setPw]           = useState("");
-  const [showPw, setShowPw]   = useState(false);
   const [loginErr, setLoginErr] = useState("");
 
   const [tab, setTab]         = useState<"users" | "payments">("users");
@@ -343,18 +342,14 @@ export default function Admin() {
             <div className="space-y-3">
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary/50" />
-                <input type="email" value={email} onChange={e => { setEmail(e.target.value); setLoginErr(""); }}
-                  onKeyDown={e => e.key === "Enter" && handleLogin()} placeholder="Admin email"
-                  className="w-full pl-10 pr-4 py-3 rounded-xl bg-white/5 border border-white/10 focus:border-primary/50 text-white text-sm placeholder:text-white/20 focus:outline-none transition-colors" />
+                <input type="email" value={email} readOnly
+                  className="w-full pl-10 pr-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white/60 text-sm cursor-not-allowed select-none focus:outline-none" />
               </div>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary/50" />
-                <input type={showPw ? "text" : "password"} value={pw} onChange={e => { setPw(e.target.value); setLoginErr(""); }}
+                <input type="password" value={pw} onChange={e => { setPw(e.target.value); setLoginErr(""); }}
                   onKeyDown={e => e.key === "Enter" && handleLogin()} placeholder="Password"
-                  className="w-full pl-10 pr-10 py-3 rounded-xl bg-white/5 border border-white/10 focus:border-primary/50 text-white text-sm placeholder:text-white/20 focus:outline-none transition-colors" />
-                <button type="button" onClick={() => setShowPw(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60">
-                  {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
+                  className="w-full pl-10 pr-4 py-3 rounded-xl bg-white/5 border border-white/10 focus:border-primary/50 text-white text-sm placeholder:text-white/20 focus:outline-none transition-colors" />
               </div>
 
               <AnimatePresence>
