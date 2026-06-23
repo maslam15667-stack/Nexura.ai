@@ -1,33 +1,85 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useSolveMath } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Calculator, Camera, Loader2, X, Image } from "lucide-react";
-import { motion } from "framer-motion";
+import {
+  Calculator, Camera, Loader2, X, ScanLine,
+  CheckCircle, Upload, RotateCcw, Lightbulb, ChevronRight,
+} from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { LogoBackground } from "@/components/LogoBackground";
 
+/* ── helpers ── */
+function dataUrlToBase64(dataUrl: string): string {
+  return dataUrl.split(",")[1] ?? "";
+}
+
+function ScanOverlay() {
+  return (
+    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+      {/* dim surround */}
+      <div className="absolute inset-0 bg-black/40" />
+      {/* scan window */}
+      <div className="relative w-[78%] h-44 z-10">
+        {/* animated scan line */}
+        <motion.div
+          className="absolute inset-x-0 h-0.5 bg-primary/80 shadow-[0_0_8px_rgba(0,212,255,0.9)]"
+          animate={{ top: ["10%", "90%", "10%"] }}
+          transition={{ duration: 2.4, ease: "easeInOut", repeat: Infinity }}
+        />
+        {/* corner marks */}
+        {[
+          "top-0 left-0 border-t-2 border-l-2",
+          "top-0 right-0 border-t-2 border-r-2",
+          "bottom-0 left-0 border-b-2 border-l-2",
+          "bottom-0 right-0 border-b-2 border-r-2",
+        ].map((cls, i) => (
+          <div key={i} className={`absolute w-5 h-5 border-primary ${cls}`} />
+        ))}
+      </div>
+      {/* label */}
+      <p className="absolute bottom-6 left-0 right-0 text-center text-xs text-primary/90 font-mono tracking-wider z-10">
+        POINT AT QUESTION · TAP CAPTURE
+      </p>
+    </div>
+  );
+}
+
 export default function MathSolver() {
-  const [problem, setProblem] = useState("");
+  const [problem, setProblem]           = useState("");
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
-  const [showCamera, setShowCamera] = useState(false);
-  const videoRef  = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
+  const [showCamera, setShowCamera]     = useState(false);
+  const [autoSolving, setAutoSolving]   = useState(false);
+
+  const videoRef   = useRef<HTMLVideoElement>(null);
+  const canvasRef  = useRef<HTMLCanvasElement>(null);
+  const streamRef  = useRef<MediaStream | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const solveMath = useSolveMath();
 
-  const handleSolve = () => {
-    const payload = capturedImage
-      ? { problem: problem || "Solve this math problem from the image", imageBase64: capturedImage }
-      : { problem };
-    if (!payload.problem && !capturedImage) return;
-    solveMath.mutate({ data: payload });
+  /* auto-solve immediately after image is captured */
+  useEffect(() => {
+    if (!capturedImage || !autoSolving) return;
+    setAutoSolving(false);
+    solveMath.mutate({
+      data: { problem: "Solve the math question in this image. Ignore any written answers.", imageBase64: capturedImage },
+    });
+  }, [capturedImage, autoSolving]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleSolveText = () => {
+    if (!problem.trim()) return;
+    solveMath.reset();
+    solveMath.mutate({ data: { problem } });
   };
 
   const openCamera = async () => {
     setShowCamera(true);
+    solveMath.reset();
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } },
+      });
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
@@ -46,9 +98,9 @@ export default function MathSolver() {
     canvas.width  = video.videoWidth;
     canvas.height = video.videoHeight;
     canvas.getContext("2d")?.drawImage(video, 0, 0);
-    const dataUrl = canvas.toDataURL("image/jpeg", 0.8);
-    const base64  = dataUrl.split(",")[1];
+    const base64 = dataUrlToBase64(canvas.toDataURL("image/jpeg", 0.92));
     setCapturedImage(base64);
+    setAutoSolving(true);
     closeCamera();
   };
 
@@ -58,155 +110,266 @@ export default function MathSolver() {
     setShowCamera(false);
   };
 
-  const clearImage = () => {
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const dataUrl = ev.target?.result as string;
+      const base64 = dataUrlToBase64(dataUrl);
+      setCapturedImage(base64);
+      setAutoSolving(true);
+      solveMath.reset();
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
+
+  const clearAll = () => {
     setCapturedImage(null);
+    setProblem("");
     solveMath.reset();
   };
 
-  const canSolve = (problem.trim() || !!capturedImage) && !solveMath.isPending;
+  const isSolving = solveMath.isPending;
 
   return (
-    <div className="flex flex-col h-full relative overflow-y-auto p-4 md:p-8">
+    <div className="flex flex-col h-full relative overflow-y-auto">
       <LogoBackground />
 
-      <div className="relative z-10 max-w-4xl mx-auto w-full space-y-6">
+      <div className="relative z-10 max-w-2xl mx-auto w-full px-4 py-6 space-y-5">
+
+        {/* Header */}
         <div className="flex items-center gap-3">
-          <div className="p-2 rounded-xl bg-primary/20 border border-primary/30">
+          <div className="p-2.5 rounded-xl bg-primary/20 border border-primary/30 shadow-[0_0_12px_rgba(0,212,255,0.2)]">
             <Calculator className="w-6 h-6 text-primary" />
           </div>
           <div>
             <h1 className="text-2xl font-display font-bold glow-text">Math Solver</h1>
-            <p className="text-muted-foreground text-sm">Type a problem or take a photo</p>
+            <p className="text-xs text-muted-foreground">Camera auto-detects questions · ignores written answers</p>
           </div>
         </div>
 
         {/* Camera view */}
-        {showCamera && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="relative glass rounded-2xl overflow-hidden border border-primary/30"
-          >
-            <video ref={videoRef} autoPlay playsInline className="w-full rounded-2xl" />
-            <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-4">
-              <Button
-                onClick={capturePhoto}
-                data-testid="button-capture-photo"
-                className="bg-primary hover:bg-primary/80 text-black font-bold px-8 py-3 rounded-full shadow-[0_0_20px_rgba(0,212,255,0.6)]"
-              >
-                <Image className="w-5 h-5 mr-2" />
-                Capture
-              </Button>
-              <Button
-                variant="outline"
-                onClick={closeCamera}
-                className="border-red-400/50 text-red-400 hover:bg-red-400/10 rounded-full px-6"
-              >
-                Cancel
-              </Button>
-            </div>
-          </motion.div>
-        )}
+        <AnimatePresence>
+          {showCamera && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.96 }}
+              className="relative rounded-2xl overflow-hidden border border-primary/40 shadow-[0_0_20px_rgba(0,212,255,0.15)] bg-black"
+            >
+              <video ref={videoRef} autoPlay playsInline className="w-full aspect-video object-cover" />
+              <ScanOverlay />
+              <div className="absolute bottom-4 inset-x-0 flex justify-center gap-3 z-20">
+                <button
+                  onClick={capturePhoto}
+                  className="w-16 h-16 rounded-full bg-white border-4 border-primary shadow-[0_0_20px_rgba(0,212,255,0.7)] hover:scale-105 transition-transform flex items-center justify-center"
+                >
+                  <Camera className="w-7 h-7 text-primary" />
+                </button>
+                <button
+                  onClick={closeCamera}
+                  className="self-end mb-1 px-4 py-2 rounded-full bg-black/60 border border-red-400/40 text-red-400 text-sm hover:bg-red-400/10 transition-all"
+                >
+                  Cancel
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         <canvas ref={canvasRef} className="hidden" />
+        <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileUpload} />
 
         {/* Captured image preview */}
-        {capturedImage && !showCamera && (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="relative glass rounded-2xl overflow-hidden border border-primary/30"
-          >
-            <img
-              src={`data:image/jpeg;base64,${capturedImage}`}
-              alt="Captured math problem"
-              className="w-full max-h-64 object-contain rounded-2xl"
-            />
-            <button
-              onClick={clearImage}
-              className="absolute top-2 right-2 bg-red-500/80 hover:bg-red-500 text-white rounded-full p-1.5 transition-all"
-              data-testid="button-clear-image"
+        <AnimatePresence>
+          {capturedImage && !showCamera && (
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              className="relative rounded-2xl overflow-hidden border border-primary/30 bg-black"
             >
-              <X className="w-4 h-4" />
-            </button>
-            <div className="absolute bottom-2 left-2 bg-black/60 rounded-lg px-2 py-1">
-              <p className="text-xs text-primary">Photo captured — ready to solve</p>
-            </div>
-          </motion.div>
-        )}
+              <img
+                src={`data:image/jpeg;base64,${capturedImage}`}
+                alt="Captured math problem"
+                className="w-full max-h-56 object-contain"
+              />
+              {/* status overlay */}
+              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent px-4 py-3 flex items-center justify-between">
+                {isSolving ? (
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="w-4 h-4 text-primary animate-spin" />
+                    <span className="text-xs text-primary font-semibold">Reading question from photo...</span>
+                  </div>
+                ) : solveMath.data ? (
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="w-4 h-4 text-green-400" />
+                    <span className="text-xs text-green-400 font-semibold">Question detected & solved!</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <ScanLine className="w-4 h-4 text-primary" />
+                    <span className="text-xs text-primary">Photo ready</span>
+                  </div>
+                )}
+                <button onClick={clearAll} className="text-white/50 hover:text-white transition-colors">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-        {/* Input row */}
+        {/* Input area — only shown when no camera */}
         {!showCamera && (
           <div className="space-y-3">
-            <Textarea
-              value={problem}
-              onChange={(e) => setProblem(e.target.value)}
-              placeholder={capturedImage ? "Optional: describe the problem or leave blank..." : "e.g. solve 2x + 5 = 15, or integrate x² dx..."}
-              data-testid="input-math-problem"
-              className="text-base bg-input/50 border-primary/30 glow-border rounded-xl resize-none min-h-[80px]"
-            />
-            <div className="flex gap-3">
-              <Button
-                onClick={handleSolve}
-                disabled={!canSolve}
-                data-testid="button-solve-math"
-                className="flex-1 bg-primary hover:bg-primary/80 text-black font-bold py-6 text-base"
-              >
-                {solveMath.isPending ? (
-                  <><Loader2 className="w-5 h-5 mr-2 animate-spin" /> Solving...</>
-                ) : (
-                  <><Calculator className="w-5 h-5 mr-2" /> Solve Step by Step</>
-                )}
-              </Button>
+            {!capturedImage && (
+              <Textarea
+                value={problem}
+                onChange={e => setProblem(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter" && e.ctrlKey) handleSolveText(); }}
+                placeholder="Type any math problem… e.g. 2x + 5 = 15, integrate x², find area of circle r=7…"
+                className="text-sm bg-input/50 border-primary/30 glow-border rounded-xl resize-none min-h-[90px] placeholder:text-white/20"
+              />
+            )}
+
+            <div className="flex gap-2">
+              {/* Solve text button — only shown when no image */}
+              {!capturedImage && (
+                <Button
+                  onClick={handleSolveText}
+                  disabled={!problem.trim() || isSolving}
+                  className="flex-1 bg-primary hover:bg-primary/80 text-black font-bold py-6 text-sm"
+                >
+                  {isSolving
+                    ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Solving...</>
+                    : <><Calculator className="w-4 h-4 mr-2" /> Solve Step by Step</>
+                  }
+                </Button>
+              )}
+
+              {/* Re-solve button when image present but already solved */}
+              {capturedImage && !isSolving && (
+                <Button
+                  onClick={() => solveMath.mutate({ data: { problem: "Solve the math question in this image.", imageBase64: capturedImage } })}
+                  className="flex-1 bg-primary hover:bg-primary/80 text-black font-bold py-5 text-sm"
+                >
+                  <RotateCcw className="w-4 h-4 mr-2" /> Re-solve
+                </Button>
+              )}
+
+              {/* Camera */}
               <Button
                 onClick={openCamera}
                 variant="outline"
-                data-testid="button-open-camera"
                 className="border-primary/30 text-primary hover:bg-primary/10 py-6 px-5"
                 title="Take photo of problem"
               >
                 <Camera className="w-5 h-5" />
               </Button>
+
+              {/* Upload from gallery */}
+              <Button
+                onClick={() => fileInputRef.current?.click()}
+                variant="outline"
+                className="border-white/15 text-white/50 hover:bg-white/5 py-6 px-4"
+                title="Upload image from gallery"
+              >
+                <Upload className="w-4 h-4" />
+              </Button>
             </div>
           </div>
         )}
 
+        {/* Solving skeleton */}
+        <AnimatePresence>
+          {isSolving && !capturedImage && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="glass rounded-2xl border border-primary/20 p-5 space-y-3"
+            >
+              {[80, 60, 90, 50].map((w, i) => (
+                <div key={i} className="flex gap-3 items-center">
+                  <div className="w-5 h-5 rounded-full bg-primary/20 animate-pulse flex-shrink-0" />
+                  <div className={`h-3 rounded-full bg-white/10 animate-pulse`} style={{ width: `${w}%` }} />
+                </div>
+              ))}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Solution */}
-        {solveMath.data && (
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-            <div className="glass rounded-2xl border border-primary/30 overflow-hidden">
-              <div className="bg-primary/10 px-6 py-4 border-b border-primary/20">
-                <h2 className="text-lg font-bold text-primary flex items-center gap-2">
-                  <Calculator className="w-5 h-5" /> Solution
-                </h2>
-              </div>
-              <div className="p-6 space-y-6">
-                <div className="space-y-3">
-                  <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">Steps</h3>
+        <AnimatePresence>
+          {solveMath.data && !isSolving && (
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="space-y-4"
+            >
+              {/* Steps */}
+              <div className="glass rounded-2xl border border-primary/25 overflow-hidden">
+                <div className="bg-primary/10 px-5 py-3.5 border-b border-primary/20 flex items-center gap-2">
+                  <Lightbulb className="w-4 h-4 text-yellow-400" />
+                  <h2 className="text-sm font-bold text-white">Step-by-Step Solution</h2>
+                  <span className="ml-auto text-xs text-primary/50 font-mono">{solveMath.data.steps.length} steps</span>
+                </div>
+                <div className="p-4 space-y-2.5">
                   {solveMath.data.steps.map((step, i) => (
                     <motion.div
                       key={i}
-                      initial={{ opacity: 0, x: -10 }}
+                      initial={{ opacity: 0, x: -12 }}
                       animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: i * 0.05 }}
-                      className="flex gap-4 p-3 rounded-xl bg-black/40 border border-white/5"
+                      transition={{ delay: i * 0.06 }}
+                      className="flex gap-3 p-3 rounded-xl bg-black/40 border border-white/5 group hover:border-primary/20 transition-colors"
                     >
-                      <span className="text-primary/60 font-mono text-sm shrink-0">{i + 1}.</span>
-                      <p className="text-sm leading-relaxed">{step}</p>
+                      <div className="w-6 h-6 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <span className="text-[10px] font-bold text-primary">{i + 1}</span>
+                      </div>
+                      <p className="text-sm leading-relaxed text-white/85">{step}</p>
                     </motion.div>
                   ))}
                 </div>
-                <div className="pt-4 border-t border-border/30">
-                  <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-3">Answer</h3>
-                  <p className="text-2xl font-bold text-white glow-text">{solveMath.data.answer}</p>
-                  {solveMath.data.latex && (
-                    <p className="text-sm text-muted-foreground mt-2 font-mono">{solveMath.data.latex}</p>
-                  )}
-                </div>
               </div>
-            </div>
-          </motion.div>
-        )}
+
+              {/* Final answer */}
+              <motion.div
+                initial={{ opacity: 0, scale: 0.97 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.1 }}
+                className="rounded-2xl border border-green-500/40 bg-green-500/10 overflow-hidden"
+              >
+                <div className="px-5 py-3 border-b border-green-500/20 flex items-center gap-2">
+                  <CheckCircle className="w-4 h-4 text-green-400" />
+                  <h2 className="text-sm font-bold text-green-400">Final Answer</h2>
+                </div>
+                <div className="px-5 py-4 flex items-center gap-3">
+                  <ChevronRight className="w-5 h-5 text-green-400 flex-shrink-0" />
+                  <p className="text-xl font-display font-bold text-white" style={{ textShadow: "0 0 12px rgba(74,222,128,0.5)" }}>
+                    {solveMath.data.answer}
+                  </p>
+                </div>
+                {solveMath.data.latex && (
+                  <div className="px-5 pb-4">
+                    <p className="text-xs font-mono text-green-400/50 bg-black/30 rounded-lg px-3 py-2">{solveMath.data.latex}</p>
+                  </div>
+                )}
+              </motion.div>
+
+              {/* Solve another */}
+              <button
+                onClick={clearAll}
+                className="w-full text-xs text-white/30 hover:text-white/60 transition-colors py-2 font-mono"
+              >
+                ← Solve another problem
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
       </div>
     </div>
   );
