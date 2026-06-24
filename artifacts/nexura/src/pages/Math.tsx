@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { LogoBackground } from "@/components/LogoBackground";
+import Tesseract from "tesseract.js";
 
 /* ── helpers ── */
 function dataUrlToBase64(dataUrl: string): string {
@@ -50,6 +51,8 @@ export default function MathSolver() {
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [showCamera, setShowCamera]     = useState(false);
   const [autoSolving, setAutoSolving]   = useState(false);
+  const [ocrText, setOcrText] = useState("");
+  const [ocrLoading, setOcrLoading] = useState(false);
 
   const videoRef   = useRef<HTMLVideoElement>(null);
   const canvasRef  = useRef<HTMLCanvasElement>(null);
@@ -61,11 +64,39 @@ export default function MathSolver() {
   /* auto-solve immediately after image is captured */
   useEffect(() => {
     if (!capturedImage || !autoSolving) return;
-    setAutoSolving(false);
-    solveMath.mutate({
-      data: { problem: "Solve the math question in this image. Ignore any written answers.", imageBase64: capturedImage },
-    });
-  }, [capturedImage, autoSolving]); // eslint-disable-line react-hooks/exhaustive-deps
+    performOCR(capturedImage);
+  }, [capturedImage, autoSolving]);
+
+  const performOCR = async (base64Image: string) => {
+    setOcrLoading(true);
+    setOcrText("");
+    try {
+      const result = await Tesseract.recognize(
+        `data:image/jpeg;base64,${base64Image}`,
+        "eng"
+      );
+      const detectedText = result.data.text.trim();
+      
+      if (!detectedText) {
+        setOcrText("No question detected. Upload clear image");
+        setOcrLoading(false);
+        return;
+      }
+      
+      setOcrText(detectedText);
+      solveMath.reset();
+      setAutoSolving(false);
+      
+      // Auto-solve the detected question
+      solveMath.mutate({
+        data: { problem: detectedText },
+      });
+    } catch {
+      setOcrText("Error reading image. Please try again.");
+    } finally {
+      setOcrLoading(false);
+    }
+  };
 
   const handleSolveText = () => {
     if (!problem.trim()) return;
@@ -76,6 +107,7 @@ export default function MathSolver() {
   const openCamera = async () => {
     setShowCamera(true);
     solveMath.reset();
+    setOcrText("");
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } },
@@ -113,6 +145,13 @@ export default function MathSolver() {
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    
+    // Validate file type
+    if (!["image/jpeg", "image/png", "image/jpg"].includes(file.type)) {
+      alert("Please upload JPG/PNG");
+      return;
+    }
+    
     const reader = new FileReader();
     reader.onload = ev => {
       const dataUrl = ev.target?.result as string;
@@ -120,6 +159,7 @@ export default function MathSolver() {
       setCapturedImage(base64);
       setAutoSolving(true);
       solveMath.reset();
+      setOcrText("");
     };
     reader.readAsDataURL(file);
     e.target.value = "";
@@ -128,10 +168,11 @@ export default function MathSolver() {
   const clearAll = () => {
     setCapturedImage(null);
     setProblem("");
+    setOcrText("");
     solveMath.reset();
   };
 
-  const isSolving = solveMath.isPending;
+  const isSolving = solveMath.isPending || ocrLoading;
 
   return (
     <div className="flex flex-col h-full relative overflow-y-auto">
@@ -145,8 +186,8 @@ export default function MathSolver() {
             <Calculator className="w-6 h-6 text-primary" />
           </div>
           <div>
-            <h1 className="text-2xl font-display font-bold glow-text">Math Solver</h1>
-            <p className="text-xs text-muted-foreground">Camera auto-detects questions · ignores written answers</p>
+            <h1 className="text-2xl font-display font-bold glow-text">Math Doubt Solver</h1>
+            <p className="text-xs text-muted-foreground">Upload photo · OCR detects · Auto solves</p>
           </div>
         </div>
 
@@ -222,6 +263,26 @@ export default function MathSolver() {
           )}
         </AnimatePresence>
 
+        {/* Detected question from OCR */}
+        <AnimatePresence>
+          {ocrText && !isSolving && (
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              className="rounded-2xl border border-yellow-500/30 bg-yellow-500/10 p-4"
+            >
+              <div className="flex items-start gap-2">
+                <ScanLine className="w-4 h-4 text-yellow-400 flex-shrink-0 mt-1" />
+                <div className="flex-1">
+                  <p className="text-xs text-yellow-400/70 font-semibold mb-1">Detected Question:</p>
+                  <p className="text-sm text-white leading-relaxed">{ocrText}</p>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Input area — only shown when no camera */}
         {!showCamera && (
           <div className="space-y-3">
@@ -253,10 +314,10 @@ export default function MathSolver() {
               {/* Re-solve button when image present but already solved */}
               {capturedImage && !isSolving && (
                 <Button
-                  onClick={() => solveMath.mutate({ data: { problem: "Solve the math question in this image.", imageBase64: capturedImage } })}
+                  onClick={() => performOCR(capturedImage)}
                   className="flex-1 bg-primary hover:bg-primary/80 text-black font-bold py-5 text-sm"
                 >
-                  <RotateCcw className="w-4 h-4 mr-2" /> Re-solve
+                  <RotateCcw className="w-4 h-4 mr-2" /> Re-scan
                 </Button>
               )}
 
