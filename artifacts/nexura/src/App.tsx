@@ -15,6 +15,7 @@ import ImageGen from "@/pages/ImageGen";
 import Payment from "@/pages/Payment";
 import Prompts from "@/pages/Prompts";
 import Voice from "@/pages/Voice";
+import AICall from "@/pages/AICall";
 import Settings from "@/pages/Settings";
 import Profile from "@/pages/Profile";
 import Admin from "@/pages/Admin";
@@ -49,6 +50,7 @@ function Router() {
               <Route path="/payment" component={Payment} />
               <Route path="/prompts" component={Prompts} />
               <Route path="/voice" component={Voice} />
+              <Route path="/ai-call" component={AICall} />
               <Route path="/settings" component={Settings} />
               <Route path="/profile" component={Profile} />
               <Route component={NotFound} />
