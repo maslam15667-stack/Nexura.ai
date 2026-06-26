@@ -22,6 +22,8 @@ async function buildAll() {
     outdir: distDir,
     outExtension: { ".js": ".mjs" },
     logLevel: "info",
+    // Resolve paths using tsconfig paths
+    resolveExtensions: [".ts", ".tsx", ".js", ".jsx", ".json", ".mjs"],
     // Some packages may not be bundleable, so we externalize them, we can add more here as needed.
     // Some of the packages below may not be imported or installed, but we're adding them in case they are in the future.
     // Examples of unbundleable packages:
@@ -100,9 +102,6 @@ async function buildAll() {
       "puppeteer",
       "puppeteer-core",
       "electron",
-      // Externalize workspace packages
-      "@workspace/api-zod",
-      "@workspace/db",
     ],
     sourcemap: "linked",
     plugins: [
