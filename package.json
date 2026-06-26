@@ -4,8 +4,7 @@
   "license": "MIT",
   "scripts": {
     "build": "npm run build:api-server",
-    "build:api-server": "cd artifacts/api-server && npm run build",
-    "typecheck": "echo 'Typecheck skipped for Vercel build'"
+    "build:api-server": "cd artifacts/api-server && npm run build"
   },
   "private": true,
   "devDependencies": {
